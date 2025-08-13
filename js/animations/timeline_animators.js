@@ -387,6 +387,13 @@ class BoneAnimator extends GeneralAnimator {
                const keep = Math.min(2, Math.max(0, Math.floor(group.rotation_hinge_axis || 0)));
                const norm = d => { let r = d % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; };
                const clamp = (v, a, b) => Math.max(Math.min(v, Math.max(a,b)), Math.min(a,b));
+               const mirror = (v, a, b) => {
+                       let minv = Math.min(a, b);
+                       let maxv = Math.max(a, b);
+                       if (v > maxv) v = maxv - (v - maxv);
+                       else if (v < minv) v = minv + (minv - v);
+                       return clamp(v, minv, maxv);
+               };
                let mesh = group.mesh;
                let r = [
                        Math.radToDeg(mesh.rotation.x),
@@ -395,9 +402,9 @@ class BoneAnimator extends GeneralAnimator {
                ].map(norm);
                if (hingeLock) for (let i = 0; i < 3; i++) if (i !== keep) r[i] = 0;
                r = [
-                       clamp(r[0], min[0], max[0]),
-                       clamp(r[1], min[1], max[1]),
-                       clamp(r[2], min[2], max[2])
+                       mirror(r[0], min[0], max[0]),
+                       mirror(r[1], min[1], max[1]),
+                       mirror(r[2], min[2], max[2])
                ];
                mesh.rotation.set(
                        Math.degToRad(r[0]),
@@ -664,12 +671,12 @@ class NullObjectAnimator extends BoneAnimator {
 			if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
 		})
 
-		bones.forEach((bone, i) => {
-			let startPoint = new FIK.V3(0,0,0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
-			let endPoint = new FIK.V3(0,0,0).copy(bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
+               bones.forEach((bone, i) => {
+                        let startPoint = new FIK.V3(0,0,0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
+                        let endPoint = new FIK.V3(0,0,0).copy(bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
 
-			let ik_bone = new FIK.Bone3D(startPoint, endPoint);
-			this.chain.addBone(ik_bone);
+                        let ik_bone = new FIK.Bone3D(startPoint, endPoint);
+                        this.chain.addBone(ik_bone);
 
 			bone_references.push({
 				bone,
@@ -678,13 +685,16 @@ class NullObjectAnimator extends BoneAnimator {
 					(bones[i+1] ? bones[i+1] : target).origin[1] - bone.origin[1],
 					(bones[i+1] ? bones[i+1] : target).origin[2] - bone.origin[2]
 				).normalize()
-			})
-		})
+                        })
+                })
+                // Lower the distance threshold so the solver continues bending
+                // the chain even when the IK target is very close to the limb.
+                this.chain.solveDistanceThreshold = 0;
 
-		this.solver.add(this.chain, ik_target , true);
-		this.solver.meshChains[0].forEach(mesh => {
-			mesh.visible = false;
-		})
+                this.solver.add(this.chain, ik_target , true);
+                this.solver.meshChains[0].forEach(mesh => {
+                        mesh.visible = false;
+                })
 
 		this.solver.update();
 		
