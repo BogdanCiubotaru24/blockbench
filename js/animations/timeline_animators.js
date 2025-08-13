@@ -749,15 +749,15 @@ class NullObjectAnimator extends BoneAnimator {
 
 		if (get_samples) return results;
 	}
-	displayFrame(multiplier = 1) {
-		if (!this.doRender()) return;
-		this.getElement()
+        displayFrame(multiplier = 1) {
+               if (!this.doRender()) return;
+               const null_object = this.getElement();
 
                if (!this.muted.position) {
                        this.displayPosition(this.interpolate('position'), multiplier);
-                       if (this.group && this.group.ik_enabled) this.displayIK();
+                       if (null_object?.ik_target) this.displayIK();
                }
-	}
+       }
 }
 	NullObjectAnimator.prototype.type = 'null_object';
 	NullObjectAnimator.prototype.channels = {
