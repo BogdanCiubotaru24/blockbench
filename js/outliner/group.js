@@ -505,9 +505,39 @@ class Group extends OutlinerNode {
 			})
 			return arr;
 		}},
-		{icon: 'sort_by_alpha', name: 'menu.group.sort', condition: {modes: ['edit']}, click: function(group) {group.sortContent()}},
-		'apply_animation_preset',
-		'add_locator',
+                {icon: 'sort_by_alpha', name: 'menu.group.sort', condition: {modes: ['edit']}, click: function(group) {group.sortContent()}},
+                'apply_animation_preset',
+               {
+                       id: 'toggle_ik',
+                       name: 'Toggle IK',
+                       icon: group => group.ik_enabled ? 'check_box' : 'check_box_outline_blank',
+                       condition: {modes: ['animate']},
+                       click(clicked_group) {
+                               let value = !clicked_group.ik_enabled;
+                               let affected = Group.all.filter(g => g.selected);
+                               Undo.initEdit({elements: affected});
+                               affected.forEach(g => { g.ik_enabled = value; });
+                               Undo.finishEdit('Toggle IK mode');
+                               if (Modes.animate) Animator.preview();
+                       }
+               },
+               {
+                       id: 'set_rotation_limits',
+                       name: 'Set Rotation Limits',
+                       icon: 'straighten',
+                       click(clicked_group) {
+                               ['X','Y','Z'].forEach((axis, i) => {
+                                       let min = parseFloat(prompt(`Min ${axis}`, clicked_group.rotation_limit_min[i]));
+                                       let max = parseFloat(prompt(`Max ${axis}`, clicked_group.rotation_limit_max[i]));
+                                       if (!isNaN(min) && !isNaN(max)) {
+                                               clicked_group.rotation_limit_min[i] = min;
+                                               clicked_group.rotation_limit_max[i] = max;
+                                       }
+                               });
+                               Canvas.updateAllBones([clicked_group]);
+                       }
+               },
+               'add_locator',
 		new MenuSeparator('manage'),
 		'resolve_group',
 		'rename',
@@ -567,6 +597,9 @@ new Property(Group, 'string', 'texture', {condition: {features: ['per_group_text
 //new Property(Group, 'vector2', 'texture_size', {condition: {formats: ['optifine_entity']}});
 new Property(Group, 'vector', 'skin_original_origin', {condition: {formats: ['skin']}});
 new Property(Group, 'number', 'color');
+new Property(Group, 'boolean', 'ik_enabled');
+new Property(Group, 'vector', 'rotation_limit_min', {default: [-180, -180, -180]});
+new Property(Group, 'vector', 'rotation_limit_max', {default: [180, 180, 180]});
 
 new NodePreviewController(Group, {
 	setup(group) {
@@ -577,11 +610,27 @@ new NodePreviewController(Group, {
 
 		this.dispatchEvent('update_transform', {group});
 	},
-	updateTransform(group) {
-		Canvas.updateAllBones([group]);
+       updateTransform(group) {
+               Canvas.updateAllBones([group]);
 
-		this.dispatchEvent('update_transform', {group});
-	}
+               if (group.rotation_limit_min && group.rotation_limit_max) {
+                       if (!group.rotation_limit_helper) {
+                               let geometry = new THREE.BufferGeometry().setFromPoints([
+                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0.5,0,0),
+                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0,0.5,0),
+                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0.5),
+                               ]);
+                               let material = new THREE.LineBasicMaterial({color: 0xff0000});
+                               group.rotation_limit_helper = new THREE.LineSegments(geometry, material);
+                               group.mesh.add(group.rotation_limit_helper);
+                       }
+                       group.rotation_limit_helper.visible = true;
+               } else if (group.rotation_limit_helper) {
+                       group.rotation_limit_helper.visible = false;
+               }
+
+               this.dispatchEvent('update_transform', {group});
+       }
 })
 
 
