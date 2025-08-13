@@ -1,0 +1,25 @@
+{
+  "name": "sample_ik_skeleton",
+  "bones": [
+    {
+      "name": "root",
+      "ik_enabled": true,
+      "rotation_limit_enabled": true,
+      "rotation_limit_min": [-45, -45, -45],
+      "rotation_limit_max": [45, 45, 45],
+      "rotation_hinge_lock": false,
+      "rotation_hinge_axis": 0,
+      "children": [
+        {
+          "name": "child",
+          "ik_enabled": true,
+          "rotation_limit_enabled": true,
+          "rotation_limit_min": [-45, -45, -45],
+          "rotation_limit_max": [45, 45, 45],
+          "rotation_hinge_lock": false,
+          "rotation_hinge_axis": 0
+        }
+      ]
+    }
+  ]
+}

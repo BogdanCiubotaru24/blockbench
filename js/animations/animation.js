@@ -301,18 +301,20 @@ class Animation extends AnimationItem {
 					}
 				})
 			})
-			Outliner.elements.forEach(node => {
-				if (!node.constructor.animator) return;
-				Animator.resetLastValues();
-				let multiplier = this.blend_weight ? Math.clamp(Animator.MolangParser.parse(this.blend_weight), 0, Infinity) : 1;
-				let animator = this.getBoneAnimator(node);
-				animator.displayPosition(animator.interpolate('position'), multiplier);
-				let bone_frame_rotation = animator.displayIK(true);
-				for (let uuid in bone_frame_rotation) {
-					if (!samples[uuid]) samples[uuid] = [];
-					samples[uuid].push(bone_frame_rotation[uuid]);
-				}
-			})
+                       Outliner.elements.forEach(node => {
+                               if (!node.constructor.animator) return;
+                               Animator.resetLastValues();
+                               let multiplier = this.blend_weight ? Math.clamp(Animator.MolangParser.parse(this.blend_weight), 0, Infinity) : 1;
+                               let animator = this.getBoneAnimator(node);
+                               animator.displayPosition(animator.interpolate('position'), multiplier);
+                               if (node.ik_enabled) {
+                                       let bone_frame_rotation = animator.displayIK(true);
+                                       for (let uuid in bone_frame_rotation) {
+                                               if (!samples[uuid]) samples[uuid] = [];
+                                               samples[uuid].push(bone_frame_rotation[uuid]);
+                                       }
+                               }
+                       })
 			Animator.resetLastValues();
 			Timeline.time += interval;
 		}

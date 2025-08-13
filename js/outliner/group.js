@@ -505,13 +505,37 @@ class Group extends OutlinerNode {
 			})
 			return arr;
 		}},
-		{icon: 'sort_by_alpha', name: 'menu.group.sort', condition: {modes: ['edit']}, click: function(group) {group.sortContent()}},
-		'apply_animation_preset',
-		'add_locator',
-		new MenuSeparator('manage'),
-		'resolve_group',
-		'rename',
-		'delete'
+                {icon: 'sort_by_alpha', name: 'menu.group.sort', condition: {modes: ['edit']}, click: function(group) {group.sortContent()}},
+                'apply_animation_preset',
+               {
+                       id: 'toggle_ik',
+                       name: 'Toggle IK',
+                       icon: group => group.ik_enabled ? 'check_box' : 'check_box_outline_blank',
+                       condition: {modes: ['animate']},
+                      click(clicked_group) {
+                              let value = !clicked_group.ik_enabled;
+                              let affected = Group.all.filter(g => g.selected);
+                              if (!affected.length) affected = [clicked_group];
+                              Undo.initEdit({elements: affected});
+                              affected.forEach(g => { g.ik_enabled = value; });
+                              Undo.finishEdit('Toggle IK mode');
+                              Canvas.updateAllBones(affected);
+                              if (Modes.animate) Animator.preview();
+                      }
+               },
+               {
+                      id: 'set_rotation_limits',
+                      name: 'Set Rotation Limits',
+                      icon: 'straighten',
+                      click(clicked_group) {
+                              openRotationLimitDialog(clicked_group);
+                      }
+               },
+               'add_locator',
+                new MenuSeparator('manage'),
+                'resolve_group',
+                'rename',
+                'delete'
 	]);
 	Object.defineProperty(Group, 'all', {
 		get() {
@@ -567,6 +591,12 @@ new Property(Group, 'string', 'texture', {condition: {features: ['per_group_text
 //new Property(Group, 'vector2', 'texture_size', {condition: {formats: ['optifine_entity']}});
 new Property(Group, 'vector', 'skin_original_origin', {condition: {formats: ['skin']}});
 new Property(Group, 'number', 'color');
+new Property(Group, 'boolean', 'ik_enabled', {default: true});
+new Property(Group, 'boolean', 'rotation_limit_enabled', {default: false});
+new Property(Group, 'vector', 'rotation_limit_min', {default: [-180, -180, -180]});
+new Property(Group, 'vector', 'rotation_limit_max', {default: [180, 180, 180]});
+new Property(Group, 'boolean', 'rotation_hinge_lock', {default: false});
+new Property(Group, 'number', 'rotation_hinge_axis', {default: 0});
 
 new NodePreviewController(Group, {
 	setup(group) {
@@ -577,17 +607,84 @@ new NodePreviewController(Group, {
 
 		this.dispatchEvent('update_transform', {group});
 	},
-	updateTransform(group) {
-		Canvas.updateAllBones([group]);
+       updateTransform(group) {
+               Canvas.updateAllBones([group]);
 
-		this.dispatchEvent('update_transform', {group});
-	}
+              if (group.rotation_limit_enabled) {
+                       if (!group.rotation_limit_helper) {
+                               let geometry = new THREE.BufferGeometry().setFromPoints([
+                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0.5,0,0),
+                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0,0.5,0),
+                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0.5),
+                               ]);
+                               let material = new THREE.LineBasicMaterial({color: 0xff0000});
+                               group.rotation_limit_helper = new THREE.LineSegments(geometry, material);
+                               group.mesh.add(group.rotation_limit_helper);
+                       }
+                       group.rotation_limit_helper.visible = true;
+              } else if (group.rotation_limit_helper) {
+                       group.rotation_limit_helper.visible = false;
+              }
+
+               this.dispatchEvent('update_transform', {group});
+       }
 })
 
 
+function openRotationLimitDialog(clicked_group) {
+       let groups = Group.all.filter(g => g.selected);
+       if (!groups.length) groups = [clicked_group];
+       const g0 = groups[0];
+       const current = {
+               enabled: !!g0.rotation_limit_enabled,
+               min: Array.isArray(g0.rotation_limit_min) ? g0.rotation_limit_min.slice() : [-180, -180, -180],
+               max: Array.isArray(g0.rotation_limit_max) ? g0.rotation_limit_max.slice() : [180, 180, 180],
+               hinge_lock: !!g0.rotation_hinge_lock,
+               hinge_axis: Math.min(2, Math.max(0, Math.floor(g0.rotation_hinge_axis || 0)))
+       };
+
+       const dlg = new Dialog({
+               id: 'ik_limits_editor',
+               title: 'IK Rotation Limits',
+               width: 560,
+               form: {
+                       enabled: { label: 'Enable Limits', type: 'checkbox', value: current.enabled },
+                       min:     { label: 'Min [X,Y,Z] °', type: 'vector',   value: current.min },
+                       max:     { label: 'Max [X,Y,Z] °', type: 'vector',   value: current.max },
+                       _sep: '_',
+                       hinge_lock:  { label: 'Hinge Lock (single axis)', type: 'checkbox', value: current.hinge_lock },
+                       hinge_axis:  { label: 'Hinge Axis', type: 'inline_select', options: {0:'X',1:'Y',2:'Z'}, value: current.hinge_axis },
+                       _sep2: '_',
+                       knee_preset: { label: 'Preset: Knee (X, 0→150, lock)', type: 'buttons', buttons: ['Apply'] }
+               },
+               onFormChange(form) {
+                       if (form.knee_preset === 0) {
+                               dlg.setFormValues({
+                                       hinge_axis: 0, hinge_lock: true, enabled: true,
+                                       min: [0, 0, 0], max: [150, 0, 0]
+                               }, false);
+                       }
+               },
+               onConfirm(f) {
+                       const axis = Math.min(2, Math.max(0, Math.floor(f.hinge_axis || 0)));
+                       Undo.initEdit({groups});
+                       groups.forEach(g => {
+                               g.rotation_limit_enabled = !!f.enabled;
+                               g.rotation_limit_min = [ +f.min[0], +f.min[1], +f.min[2] ];
+                               g.rotation_limit_max = [ +f.max[0], +f.max[1], +f.max[2] ];
+                               g.rotation_hinge_lock = !!f.hinge_lock;
+                               g.rotation_hinge_axis = axis;
+                       });
+                       Undo.finishEdit('Set IK rotation limits');
+                       Canvas.updateAllBones(groups);
+               }
+       });
+       dlg.show();
+}
+
 function getCurrentGroup() {
-	if (Group.first_selected) {
-		return Group.first_selected
+        if (Group.first_selected) {
+                return Group.first_selected
 	} else if (selected.length) {
 		var g1 = selected[0].parent;
 		if (g1 instanceof Group) {

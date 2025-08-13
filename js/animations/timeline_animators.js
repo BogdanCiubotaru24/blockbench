@@ -352,14 +352,15 @@ class BoneAnimator extends GeneralAnimator {
 				})
 			}
 		}
-		if (this.rotation_global) {
-			let quat = bone.parent.getWorldQuaternion(Reusable.quat1);
-			quat.invert();
-			bone.quaternion.premultiply(quat);
-			
-		}
-		return this;
-	}
+                if (this.rotation_global) {
+                        let quat = bone.parent.getWorldQuaternion(Reusable.quat1);
+                        quat.invert();
+                        bone.quaternion.premultiply(quat);
+
+                }
+               this.clampRotation();
+               return this;
+       }
 	displayPosition(arr, multiplier = 1) {
 		var bone = this.group.mesh
 		if (arr) {
@@ -369,15 +370,42 @@ class BoneAnimator extends GeneralAnimator {
 		}
 		return this;
 	}
-	displayScale(arr, multiplier = 1) {
-		if (!arr) return this;
-		var bone = this.group.mesh;
-		bone.scale.x *= (1 + (arr[0] - 1) * multiplier) || 0.00001;
-		bone.scale.y *= (1 + (arr[1] - 1) * multiplier) || 0.00001;
-		bone.scale.z *= (1 + (arr[2] - 1) * multiplier) || 0.00001;
-		return this;
-	}
-	interpolate(channel, allow_expression, axis) {
+        displayScale(arr, multiplier = 1) {
+                if (!arr) return this;
+                var bone = this.group.mesh;
+                bone.scale.x *= (1 + (arr[0] - 1) * multiplier) || 0.00001;
+                bone.scale.y *= (1 + (arr[1] - 1) * multiplier) || 0.00001;
+                bone.scale.z *= (1 + (arr[2] - 1) * multiplier) || 0.00001;
+                return this;
+        }
+      clampRotation(group) {
+               group = group || this.getGroup();
+               if (!group || !group.rotation_limit_enabled) return;
+               const min = Array.isArray(group.rotation_limit_min) ? group.rotation_limit_min : [-180, -180, -180];
+               const max = Array.isArray(group.rotation_limit_max) ? group.rotation_limit_max : [180, 180, 180];
+               const hingeLock = !!group.rotation_hinge_lock;
+               const keep = Math.min(2, Math.max(0, Math.floor(group.rotation_hinge_axis || 0)));
+               const norm = d => { let r = d % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; };
+               const clamp = (v, a, b) => Math.max(Math.min(v, Math.max(a,b)), Math.min(a,b));
+               let mesh = group.mesh;
+               let r = [
+                       Math.radToDeg(mesh.rotation.x),
+                       Math.radToDeg(mesh.rotation.y),
+                       Math.radToDeg(mesh.rotation.z)
+               ].map(norm);
+               if (hingeLock) for (let i = 0; i < 3; i++) if (i !== keep) r[i] = 0;
+               r = [
+                       clamp(r[0], min[0], max[0]),
+                       clamp(r[1], min[1], max[1]),
+                       clamp(r[2], min[2], max[2])
+               ];
+               mesh.rotation.set(
+                       Math.degToRad(r[0]),
+                       Math.degToRad(r[1]),
+                       Math.degToRad(r[2])
+               );
+       }
+        interpolate(channel, allow_expression, axis) {
 		let time = this.animation.time;
 		var before = false
 		var after = false
@@ -600,9 +628,10 @@ class NullObjectAnimator extends BoneAnimator {
 		return this;
 	}
 	displayIK(get_samples) {
-		let null_object = this.getElement();
-		let target = [...Group.all, ...Locator.all].find(node => node.uuid == null_object.ik_target);
-		if (!null_object || !target) return;
+               let null_object = this.getElement();
+               let target = [...Group.all, ...Locator.all].find(node => node.uuid == null_object.ik_target);
+               if (!null_object || !target) return;
+               if (target instanceof Group && !target.ik_enabled) return;
 
 		let bones = [];
 		let ik_target = new THREE.Vector3().copy(null_object.getWorldCenter(true));
@@ -621,13 +650,13 @@ class NullObjectAnimator extends BoneAnimator {
 			target instanceof Group &&
 			target.mesh.getWorldQuaternion(new THREE.Quaternion());
 
-		while (current !== source) {
-			bones.push(current);
-			current = current.parent;
-		}
-		if (null_object.ik_source) {
-			bones.push(source);
-		}
+               while (current !== source) {
+                       if (current instanceof Group) bones.push(current);
+                       current = current.parent;
+               }
+               if (null_object.ik_source && source instanceof Group) {
+                       bones.push(source);
+               }
 		if (!bones.length) return;
 		bones.reverse();
 		
@@ -670,10 +699,11 @@ class NullObjectAnimator extends BoneAnimator {
 			let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
 			rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
 
-			bone_ref.bone.mesh.rotation.x += rotation.x;
-			bone_ref.bone.mesh.rotation.y += rotation.y;
-			bone_ref.bone.mesh.rotation.z += rotation.z;
-			bone_ref.bone.mesh.updateMatrixWorld();
+                       bone_ref.bone.mesh.rotation.x += rotation.x;
+                       bone_ref.bone.mesh.rotation.y += rotation.y;
+                       bone_ref.bone.mesh.rotation.z += rotation.z;
+                       this.clampRotation(bone_ref.bone);
+                       bone_ref.bone.mesh.updateMatrixWorld();
 
 			if (get_samples) {
 				results[bone_ref.bone.uuid] = {
@@ -691,10 +721,11 @@ class NullObjectAnimator extends BoneAnimator {
 			let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
 			rotation.copy(target.mesh.rotation);
 
-			target.mesh.quaternion.copy(target_original_quaternion);
-			let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
-			target.mesh.quaternion.premultiply(q1.invert())
-			target.mesh.updateMatrixWorld();
+                       target.mesh.quaternion.copy(target_original_quaternion);
+                       let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
+                       target.mesh.quaternion.premultiply(q1.invert())
+                       this.clampRotation(target);
+                       target.mesh.updateMatrixWorld();
 
 			rotation.x = target.mesh.rotation.x - rotation.x;
 			rotation.y = target.mesh.rotation.y - rotation.y;
@@ -722,10 +753,10 @@ class NullObjectAnimator extends BoneAnimator {
 		if (!this.doRender()) return;
 		this.getElement()
 
-		if (!this.muted.position) {
-			this.displayPosition(this.interpolate('position'), multiplier);
-			this.displayIK();
-		}
+               if (!this.muted.position) {
+                       this.displayPosition(this.interpolate('position'), multiplier);
+                       if (this.group && this.group.ik_enabled) this.displayIK();
+               }
 	}
 }
 	NullObjectAnimator.prototype.type = 'null_object';

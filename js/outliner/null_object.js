@@ -40,13 +40,13 @@ class NullObject extends OutlinerElement {
 		save.type = 'null_object';
 		return save;
 	}
-	init() {
-		if (this.parent instanceof Group == false) {
-			this.addTo(Group.first_selected)
-		}
-		super.init();
-		return this;
-	}
+       init() {
+               if (!(this.parent instanceof Group) && !(this.parent instanceof NullObject)) {
+                       this.addTo(Group.first_selected)
+               }
+               super.init();
+               return this;
+       }
 	select(event, isOutlinerClick) {
 		super.select(event, isOutlinerClick);
 		if (Animator.open && Animation.selected) {
@@ -110,9 +110,10 @@ class NullObject extends OutlinerElement {
 	NullObject.prototype.menu = new Menu([
 			new MenuSeparator('ik'),
 			'set_ik_target',
-			'set_ik_source',
-			{
-				id: 'lock_ik_target_rotation',
+                       'set_ik_source',
+                       'add_null_object',
+                       {
+                               id: 'lock_ik_target_rotation',
 				name: 'menu.null_object.lock_ik_target_rotation',
 				icon: null_object => null_object.lock_ik_target_rotation ? 'check_box' : 'check_box_outline_blank',
 				click(clicked_null_object) {
@@ -194,24 +195,41 @@ class NullObject extends OutlinerElement {
 })()
 
 BARS.defineActions(function() {
-	new Action('add_null_object', {
-		icon: 'far.fa-circle',
-		category: 'edit',
-		condition: () => Format.animation_mode && Modes.edit,
-		click: function () {
-			var objs = []
-			Undo.initEdit({elements: objs, outliner: true});
-			var null_object = new NullObject().addTo(Group.first_selected||selected[0]).init();
-			null_object.select().createUniqueName();
-			objs.push(null_object);
-			Undo.finishEdit('Add null object');
-			Vue.nextTick(function() {
-				if (settings.create_rename.value) {
-					null_object.rename();
-				}
-			})
-		}
-	})
+        new Action('add_null_object', {
+                icon: 'far.fa-circle',
+                category: 'edit',
+                condition: () => Format.animation_mode && Modes.edit,
+                click: function () {
+                        var objs = []
+                        Undo.initEdit({elements: objs, outliner: true});
+                        var null_object = new NullObject().addTo(Group.first_selected||selected[0]).init();
+                        null_object.select().createUniqueName();
+                        objs.push(null_object);
+                        Undo.finishEdit('Add null object');
+                        Vue.nextTick(function() {
+                                if (settings.create_rename.value) {
+                                        null_object.rename();
+                                }
+                        })
+                }
+        })
+
+       new Action('add_bone_ik_target', {
+               icon: 'fa-bullseye',
+               category: 'edit',
+               condition: () => Format.animation_mode && Modes.edit && Group.all.find(g => g.selected),
+               click() {
+                       let objs = [];
+                       Undo.initEdit({elements: objs, outliner: true});
+                       Group.all.filter(g => g.selected).forEach(group => {
+                               let pos = group.origin.slice();
+                               pos[1] += 1;
+                               let null_object = new NullObject({position: pos}).addTo(group).init();
+                               objs.push(null_object);
+                       });
+                       Undo.finishEdit('Add IK target nulls');
+               }
+       })
 	
 	new Action('set_ik_target', {
 		icon: 'fa-paperclip',
