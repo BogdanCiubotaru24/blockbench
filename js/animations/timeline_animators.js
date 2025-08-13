@@ -378,16 +378,32 @@ class BoneAnimator extends GeneralAnimator {
                 bone.scale.z *= (1 + (arr[2] - 1) * multiplier) || 0.00001;
                 return this;
         }
-       clampRotation(group) {
+      clampRotation(group) {
                group = group || this.getGroup();
-               if (!group) return;
-               let min = group.rotation_limit_min;
-               let max = group.rotation_limit_max;
-               if (!min || !max) return;
+               if (!group || !group.rotation_limit_enabled) return;
+               const min = Array.isArray(group.rotation_limit_min) ? group.rotation_limit_min : [-180, -180, -180];
+               const max = Array.isArray(group.rotation_limit_max) ? group.rotation_limit_max : [180, 180, 180];
+               const hingeLock = !!group.rotation_hinge_lock;
+               const keep = Math.min(2, Math.max(0, Math.floor(group.rotation_hinge_axis || 0)));
+               const norm = d => { let r = d % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; };
+               const clamp = (v, a, b) => Math.max(Math.min(v, Math.max(a,b)), Math.min(a,b));
                let mesh = group.mesh;
-               mesh.rotation.x = Math.clamp(mesh.rotation.x, Math.degToRad(min[0]), Math.degToRad(max[0]));
-               mesh.rotation.y = Math.clamp(mesh.rotation.y, Math.degToRad(min[1]), Math.degToRad(max[1]));
-               mesh.rotation.z = Math.clamp(mesh.rotation.z, Math.degToRad(min[2]), Math.degToRad(max[2]));
+               let r = [
+                       Math.radToDeg(mesh.rotation.x),
+                       Math.radToDeg(mesh.rotation.y),
+                       Math.radToDeg(mesh.rotation.z)
+               ].map(norm);
+               if (hingeLock) for (let i = 0; i < 3; i++) if (i !== keep) r[i] = 0;
+               r = [
+                       clamp(r[0], min[0], max[0]),
+                       clamp(r[1], min[1], max[1]),
+                       clamp(r[2], min[2], max[2])
+               ];
+               mesh.rotation.set(
+                       Math.degToRad(r[0]),
+                       Math.degToRad(r[1]),
+                       Math.degToRad(r[2])
+               );
        }
         interpolate(channel, allow_expression, axis) {
 		let time = this.animation.time;
