@@ -609,7 +609,6 @@ new NodePreviewController(Group, {
 	},
        updateTransform(group) {
                Canvas.updateAllBones([group]);
-
               if (group.rotation_limit_enabled) {
                        if (!group.rotation_limit_helper) {
                                let geometry = new THREE.BufferGeometry().setFromPoints([
@@ -625,7 +624,6 @@ new NodePreviewController(Group, {
               } else if (group.rotation_limit_helper) {
                        group.rotation_limit_helper.visible = false;
               }
-
                this.dispatchEvent('update_transform', {group});
        }
 })
