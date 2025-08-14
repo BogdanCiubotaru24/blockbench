@@ -591,7 +591,7 @@ new Property(Group, 'string', 'texture', {condition: {features: ['per_group_text
 //new Property(Group, 'vector2', 'texture_size', {condition: {formats: ['optifine_entity']}});
 new Property(Group, 'vector', 'skin_original_origin', {condition: {formats: ['skin']}});
 new Property(Group, 'number', 'color');
-new Property(Group, 'boolean', 'ik_enabled', {default: true});
+new Property(Group, 'boolean', 'ik_enabled', {default: false});
 new Property(Group, 'boolean', 'rotation_limit_enabled', {default: false});
 new Property(Group, 'vector', 'rotation_limit_min', {default: [-180, -180, -180]});
 new Property(Group, 'vector', 'rotation_limit_max', {default: [180, 180, 180]});

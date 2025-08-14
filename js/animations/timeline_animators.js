@@ -726,6 +726,15 @@ class NullObjectAnimator extends BoneAnimator {
                                Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
                                Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
                        );
+
+                       // TEST HACK: If clamp adjusted the rotation and this is the root bone (i == 0),
+                       // apply an extra -90 degrees on the X axis to test hypothesis.
+                       if (i === 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5)) {
+                               bone_ref.bone.mesh.rotation.x += Math.degToRad(-90);
+                               this.clampRotation(bone_ref.bone);
+                               bone_ref.bone.mesh.updateMatrixWorld();
+                       }
+
                        if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
                                for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
                                        let parent = bone_references[j].bone;
