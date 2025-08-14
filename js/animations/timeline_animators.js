@@ -640,124 +640,137 @@ class NullObjectAnimator extends BoneAnimator {
                if (!null_object || !target) return;
                if (target instanceof Group && !target.ik_enabled) return;
 
-		let bones = [];
-		let ik_target = new THREE.Vector3().copy(null_object.getWorldCenter(true));
-		let bone_references = [];
-		let current = target.parent;
+                let bones = [];
+                let ik_target = new THREE.Vector3().copy(null_object.getWorldCenter(true));
+                let current = target.parent;
 
-		let source;
-		if (null_object.ik_source) {
-			source = [...Group.all].find(node => node.uuid == null_object.ik_source);
-		} else {
-			source = null_object.parent;
-		}
-		if (!source) return;
-		if (!target.isChildOf(source) && source != 'root') return;
-		let target_original_quaternion = null_object.lock_ik_target_rotation &&
-			target instanceof Group &&
-			target.mesh.getWorldQuaternion(new THREE.Quaternion());
+                let source;
+                if (null_object.ik_source) {
+                        source = [...Group.all].find(node => node.uuid == null_object.ik_source);
+                } else {
+                        source = null_object.parent;
+                }
+                if (!source) return;
+                if (!target.isChildOf(source) && source != 'root') return;
+                let target_original_quaternion = null_object.lock_ik_target_rotation &&
+                        target instanceof Group &&
+                        target.mesh.getWorldQuaternion(new THREE.Quaternion());
 
-               while (current !== source) {
-                       if (current instanceof Group) bones.push(current);
-                       current = current.parent;
-               }
-               if (null_object.ik_source && source instanceof Group) {
-                       bones.push(source);
-               }
-		if (!bones.length) return;
-		bones.reverse();
-		
-		bones.forEach(bone => {
-			if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
-		})
-
-               bones.forEach((bone, i) => {
-                        let startPoint = new FIK.V3(0,0,0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
-                        let endPoint = new FIK.V3(0,0,0).copy(bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
-
-                        let ik_bone = new FIK.Bone3D(startPoint, endPoint);
-                        this.chain.addBone(ik_bone);
-
-			bone_references.push({
-				bone,
-				last_diff: new THREE.Vector3(
-					(bones[i+1] ? bones[i+1] : target).origin[0] - bone.origin[0],
-					(bones[i+1] ? bones[i+1] : target).origin[1] - bone.origin[1],
-					(bones[i+1] ? bones[i+1] : target).origin[2] - bone.origin[2]
-				).normalize()
-                        })
-                })
-                // Lower the distance threshold so the solver continues bending
-                // the chain even when the IK target is very close to the limb.
-                this.chain.solveDistanceThreshold = 0;
-
-                this.solver.add(this.chain, ik_target , true);
-                this.solver.meshChains[0].forEach(mesh => {
-                        mesh.visible = false;
+                while (current !== source) {
+                        if (current instanceof Group) bones.push(current);
+                        current = current.parent;
+                }
+                if (null_object.ik_source && source instanceof Group) {
+                        bones.push(source);
+                }
+                if (!bones.length) return;
+                bones.reverse();
+                bones.forEach(bone => {
+                        if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
                 })
 
-		this.solver.update();
-		
-		let results = {};
-		bone_references.forEach((bone_ref, i) => {
-			let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
-			let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
-			bones[i].mesh.worldToLocal(start);
-			bones[i].mesh.worldToLocal(end);
+                let bone_references = bones.map((bone, i) => ({
+                        bone,
+                        dir: new THREE.Vector3(
+                                (bones[i+1] ? bones[i+1] : target).origin[0] - bone.origin[0],
+                                (bones[i+1] ? bones[i+1] : target).origin[1] - bone.origin[1],
+                                (bones[i+1] ? bones[i+1] : target).origin[2] - bone.origin[2]
+                        ).normalize(),
+                }));
 
-			Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
-			let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
-			rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
+                let results = {};
+                if (get_samples) {
+                        bone_references.forEach(ref => {
+                                results[ref.bone.uuid] = {euler: new THREE.Euler()};
+                        });
+                }
 
-                       bone_ref.bone.mesh.rotation.x += rotation.x;
-                       bone_ref.bone.mesh.rotation.y += rotation.y;
-                       bone_ref.bone.mesh.rotation.z += rotation.z;
-                       this.clampRotation(bone_ref.bone);
-                       bone_ref.bone.mesh.updateMatrixWorld();
+                const iterations = 5;
+                for (let iter = 0; iter < iterations; iter++) {
+                        this.chain.clear();
+                        this.solver.clear();
+                        bone_references.forEach((ref, i) => {
+                                let startPoint = new FIK.V3(0,0,0).copy(ref.bone.mesh.getWorldPosition(new THREE.Vector3()));
+                                let endPoint = new FIK.V3(0,0,0).copy(bone_references[i+1] ? bone_references[i+1].bone.mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
 
-			if (get_samples) {
-				results[bone_ref.bone.uuid] = {
-					euler: rotation,
-					array: [
-						Math.radToDeg(-rotation.x),
-						Math.radToDeg(-rotation.y),
-						Math.radToDeg(rotation.z),
-					]
-				}
-			}
-		})
+                                let ik_bone = new FIK.Bone3D(startPoint, endPoint);
+                                this.chain.addBone(ik_bone);
+                        });
 
-		if (target_original_quaternion) {
-			let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
-			rotation.copy(target.mesh.rotation);
+                        this.solver.add(this.chain, ik_target , true);
+                        this.solver.meshChains[0].forEach(mesh => { mesh.visible = false; });
+                        this.solver.update();
 
-                       target.mesh.quaternion.copy(target_original_quaternion);
-                       let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
-                       target.mesh.quaternion.premultiply(q1.invert())
-                       this.clampRotation(target);
-                       target.mesh.updateMatrixWorld();
+                        bone_references.forEach((ref, i) => {
+                                let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
+                                let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
+                                ref.bone.mesh.worldToLocal(start);
+                                ref.bone.mesh.worldToLocal(end);
 
-			rotation.x = target.mesh.rotation.x - rotation.x;
-			rotation.y = target.mesh.rotation.y - rotation.y;
-			rotation.z = target.mesh.rotation.z - rotation.z;
+                                let new_dir = end.sub(start).normalize();
+                                Reusable.quat1.setFromUnitVectors(ref.dir, new_dir);
+                                let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
+                                rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
 
-			if (get_samples) {
-				results[target.uuid] = {
-					euler: rotation,
-					array: [
-						Math.radToDeg(-rotation.x),
-						Math.radToDeg(-rotation.y),
-						Math.radToDeg(rotation.z),
-					]
-				}
-			}
-		}
+                                ref.bone.mesh.rotation.x += rotation.x;
+                                ref.bone.mesh.rotation.y += rotation.y;
+                                ref.bone.mesh.rotation.z += rotation.z;
+                                this.clampRotation(ref.bone);
+                                ref.bone.mesh.updateMatrixWorld();
+                                ref.dir.copy(new_dir);
 
-		this.solver.clear();
-		this.chain.clear();
-		this.chain.lastTargetLocation.set(1e9, 0, 0);
+                                if (get_samples) {
+                                        let r = results[ref.bone.uuid];
+                                        r.euler.x += rotation.x;
+                                        r.euler.y += rotation.y;
+                                        r.euler.z += rotation.z;
+                                }
+                        });
+                }
 
-		if (get_samples) return results;
+                if (target_original_quaternion) {
+                        let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
+                        rotation.copy(target.mesh.rotation);
+
+                        target.mesh.quaternion.copy(target_original_quaternion);
+                        let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
+                        target.mesh.quaternion.premultiply(q1.invert())
+                        this.clampRotation(target);
+                        target.mesh.updateMatrixWorld();
+
+                        rotation.x = target.mesh.rotation.x - rotation.x;
+                        rotation.y = target.mesh.rotation.y - rotation.y;
+                        rotation.z = target.mesh.rotation.z - rotation.z;
+
+                        if (get_samples) {
+                                results[target.uuid] = {
+                                        euler: rotation,
+                                        array: [
+                                                Math.radToDeg(-rotation.x),
+                                                Math.radToDeg(-rotation.y),
+                                                Math.radToDeg(rotation.z),
+                                        ]
+                                }
+                        }
+                }
+
+                this.solver.clear();
+                this.chain.clear();
+                this.chain.lastTargetLocation.set(1e9, 0, 0);
+
+                if (get_samples) {
+                        for (let uuid in results) {
+                                let r = results[uuid];
+                                if (!r.array) {
+                                        r.array = [
+                                                Math.radToDeg(-r.euler.x),
+                                                Math.radToDeg(-r.euler.y),
+                                                Math.radToDeg(r.euler.z),
+                                        ];
+                                }
+                        }
+                        return results;
+                }
 	}
         displayFrame(multiplier = 1) {
                if (!this.doRender()) return;
