@@ -726,13 +726,14 @@ class NullObjectAnimator extends BoneAnimator {
                                Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
                                Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
                        );
-                       if (Reusable.vec3.x || Reusable.vec3.y || Reusable.vec3.z) {
-                               for (let j = i - 1; j >= 0 && (Reusable.vec3.x || Reusable.vec3.y || Reusable.vec3.z); j--) {
+                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+                               for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
                                        let parent = bone_references[j].bone;
                                        Reusable.euler2.copy(parent.mesh.rotation);
-                                       parent.mesh.rotation.x += Reusable.vec3.x;
-                                       parent.mesh.rotation.y += Reusable.vec3.y;
-                                       parent.mesh.rotation.z += Reusable.vec3.z;
+                                       const share = j + 1;
+                                       parent.mesh.rotation.x += Reusable.vec3.x / share;
+                                       parent.mesh.rotation.y += Reusable.vec3.y / share;
+                                       parent.mesh.rotation.z += Reusable.vec3.z / share;
                                        this.clampRotation(parent);
                                        parent.mesh.updateMatrixWorld();
                                        Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
@@ -756,13 +757,14 @@ class NullObjectAnimator extends BoneAnimator {
                                Reusable.euler2.y - target.mesh.rotation.y,
                                Reusable.euler2.z - target.mesh.rotation.z
                        );
-                       if (Reusable.vec3.x || Reusable.vec3.y || Reusable.vec3.z) {
-                               for (let j = bone_references.length - 1; j >= 0 && (Reusable.vec3.x || Reusable.vec3.y || Reusable.vec3.z); j--) {
+                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+                               for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
                                        let parent = bone_references[j].bone;
                                        Reusable.euler2.copy(parent.mesh.rotation);
-                                       parent.mesh.rotation.x += Reusable.vec3.x;
-                                       parent.mesh.rotation.y += Reusable.vec3.y;
-                                       parent.mesh.rotation.z += Reusable.vec3.z;
+                                       const share = j + 1;
+                                       parent.mesh.rotation.x += Reusable.vec3.x / share;
+                                       parent.mesh.rotation.y += Reusable.vec3.y / share;
+                                       parent.mesh.rotation.z += Reusable.vec3.z / share;
                                        this.clampRotation(parent);
                                        parent.mesh.updateMatrixWorld();
                                        Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
