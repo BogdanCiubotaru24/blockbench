@@ -665,7 +665,6 @@ class NullObjectAnimator extends BoneAnimator {
                 }
                 if (!bones.length) return;
                 bones.reverse();
-
                 bones.forEach(bone => {
                         if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
                 })
