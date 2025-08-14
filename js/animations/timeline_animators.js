@@ -673,105 +673,114 @@ class NullObjectAnimator extends BoneAnimator {
                        base_rotations[bone.uuid] = bone.mesh.rotation.clone();
                })
 
-              bones.forEach((bone, i) => {
-                        let startPoint = new FIK.V3(0,0,0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
-                        let endPoint = new FIK.V3(0,0,0).copy(bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
-
-                        let ik_bone = new FIK.Bone3D(startPoint, endPoint);
-                        this.chain.addBone(ik_bone);
-
-			bone_references.push({
-				bone,
-				last_diff: new THREE.Vector3(
-					(bones[i+1] ? bones[i+1] : target).origin[0] - bone.origin[0],
-					(bones[i+1] ? bones[i+1] : target).origin[1] - bone.origin[1],
-					(bones[i+1] ? bones[i+1] : target).origin[2] - bone.origin[2]
-				).normalize()
-                        })
-                })
-                // Lower the distance threshold so the solver continues bending
-                // the chain even when the IK target is very close to the limb.
-                this.chain.solveDistanceThreshold = 0;
-
-                this.solver.add(this.chain, ik_target , true);
-                this.solver.meshChains[0].forEach(mesh => {
-                        mesh.visible = false;
-                })
+              bone_references = bones.map((bone, i) => ({
+                        bone,
+                        last_diff: new THREE.Vector3(
+                                (bones[i+1] ? bones[i+1] : target).origin[0] - bone.origin[0],
+                                (bones[i+1] ? bones[i+1] : target).origin[1] - bone.origin[1],
+                                (bones[i+1] ? bones[i+1] : target).origin[2] - bone.origin[2]
+                        ).normalize()
+                }));
 
                if (target_original_quaternion) {
                        base_rotations[target.uuid] = target.mesh.rotation.clone();
                }
 
-               this.solver.update();
+               const MAX_ITERS = 6;
+               const EPSILON = 1e-3;
+               for (let iter = 0; iter < MAX_ITERS; iter++) {
+                        this.chain.clear();
+                        bone_references.forEach((ref, i) => {
+                                let startPoint = new FIK.V3(0,0,0).copy(ref.bone.mesh.getWorldPosition(new THREE.Vector3()));
+                                let endPoint = new FIK.V3(0,0,0).copy(bone_references[i+1] ? bone_references[i+1].bone.mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
+                                this.chain.addBone(new FIK.Bone3D(startPoint, endPoint));
+                        });
+                        // Lower the distance threshold so the solver continues bending
+                        // the chain even when the IK target is very close to the limb.
+                        this.chain.solveDistanceThreshold = 0;
 
-               bone_references.forEach((bone_ref, i) => {
-                       let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
-                       let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
-                       bones[i].mesh.worldToLocal(start);
-                       bones[i].mesh.worldToLocal(end);
+                        this.solver.clear();
+                        this.solver.add(this.chain, ik_target , true);
+                        if (this.solver.meshChains[0]) {
+                                this.solver.meshChains[0].forEach(mesh => {
+                                        mesh.visible = false;
+                                });
+                        }
 
-                       Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
-                       let rotation = Reusable.euler1;
-                       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
+                        this.solver.update();
 
-                      bone_ref.bone.mesh.rotation.x += rotation.x;
-                      bone_ref.bone.mesh.rotation.y += rotation.y;
-                      bone_ref.bone.mesh.rotation.z += rotation.z;
+                        bone_references.forEach((bone_ref, i) => {
+                                let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
+                                let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
+                                bone_ref.bone.mesh.worldToLocal(start);
+                                bone_ref.bone.mesh.worldToLocal(end);
 
-                       Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
-                      this.clampRotation(bone_ref.bone);
-                      bone_ref.bone.mesh.updateMatrixWorld();
-                       Reusable.vec3.set(
-                               Reusable.euler2.x - bone_ref.bone.mesh.rotation.x,
-                               Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
-                               Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
-                       );
-                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
-                               for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
-                                       let parent = bone_references[j].bone;
-                                       Reusable.euler2.copy(parent.mesh.rotation);
-                                       const share = j + 1;
-                                       parent.mesh.rotation.x += Reusable.vec3.x / share;
-                                       parent.mesh.rotation.y += Reusable.vec3.y / share;
-                                       parent.mesh.rotation.z += Reusable.vec3.z / share;
-                                       this.clampRotation(parent);
-                                       parent.mesh.updateMatrixWorld();
-                                       Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
-                                       Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
-                                       Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
-                               }
-                       }
-               })
+                                Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
+                                let rotation = Reusable.euler1;
+                                rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
 
-               if (target_original_quaternion) {
-                       Reusable.euler2.copy(target.mesh.rotation);
+                                bone_ref.bone.mesh.rotation.x += rotation.x;
+                                bone_ref.bone.mesh.rotation.y += rotation.y;
+                                bone_ref.bone.mesh.rotation.z += rotation.z;
 
-                      target.mesh.quaternion.copy(target_original_quaternion);
-                      let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
-                      target.mesh.quaternion.premultiply(q1.invert())
-                      this.clampRotation(target);
-                      target.mesh.updateMatrixWorld();
+                                Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
+                                this.clampRotation(bone_ref.bone);
+                                bone_ref.bone.mesh.updateMatrixWorld();
+                                Reusable.vec3.set(
+                                        Reusable.euler2.x - bone_ref.bone.mesh.rotation.x,
+                                        Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
+                                        Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
+                                );
+                                if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+                                        for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
+                                                let parent = bone_references[j].bone;
+                                                Reusable.euler2.copy(parent.mesh.rotation);
+                                                const share = j + 1;
+                                                parent.mesh.rotation.x += Reusable.vec3.x / share;
+                                                parent.mesh.rotation.y += Reusable.vec3.y / share;
+                                                parent.mesh.rotation.z += Reusable.vec3.z / share;
+                                                this.clampRotation(parent);
+                                                parent.mesh.updateMatrixWorld();
+                                                Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
+                                                Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
+                                                Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
+                                        }
+                                }
+                        });
 
-                       Reusable.vec3.set(
-                               Reusable.euler2.x - target.mesh.rotation.x,
-                               Reusable.euler2.y - target.mesh.rotation.y,
-                               Reusable.euler2.z - target.mesh.rotation.z
-                       );
-                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
-                               for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
-                                       let parent = bone_references[j].bone;
-                                       Reusable.euler2.copy(parent.mesh.rotation);
-                                       const share = j + 1;
-                                       parent.mesh.rotation.x += Reusable.vec3.x / share;
-                                       parent.mesh.rotation.y += Reusable.vec3.y / share;
-                                       parent.mesh.rotation.z += Reusable.vec3.z / share;
-                                       this.clampRotation(parent);
-                                       parent.mesh.updateMatrixWorld();
-                                       Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
-                                       Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
-                                       Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
-                               }
-                       }
+                        if (target_original_quaternion) {
+                                Reusable.euler2.copy(target.mesh.rotation);
+
+                                target.mesh.quaternion.copy(target_original_quaternion);
+                                let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
+                                target.mesh.quaternion.premultiply(q1.invert())
+                                this.clampRotation(target);
+                                target.mesh.updateMatrixWorld();
+
+                                Reusable.vec3.set(
+                                        Reusable.euler2.x - target.mesh.rotation.x,
+                                        Reusable.euler2.y - target.mesh.rotation.y,
+                                        Reusable.euler2.z - target.mesh.rotation.z
+                                );
+                                if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+                                        for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
+                                                let parent = bone_references[j].bone;
+                                                Reusable.euler2.copy(parent.mesh.rotation);
+                                                const share = j + 1;
+                                                parent.mesh.rotation.x += Reusable.vec3.x / share;
+                                                parent.mesh.rotation.y += Reusable.vec3.y / share;
+                                                parent.mesh.rotation.z += Reusable.vec3.z / share;
+                                                this.clampRotation(parent);
+                                                parent.mesh.updateMatrixWorld();
+                                                Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
+                                                Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
+                                                Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
+                                        }
+                                }
+                        }
+
+                        let tip_error = target.mesh.getWorldPosition(new THREE.Vector3()).distanceTo(ik_target);
+                        if (tip_error < EPSILON) break;
                }
 
                let results = {};
