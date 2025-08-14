@@ -667,11 +667,13 @@ class NullObjectAnimator extends BoneAnimator {
 		if (!bones.length) return;
 		bones.reverse();
 		
-		bones.forEach(bone => {
-			if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
-		})
+               let base_rotations = {};
+               bones.forEach(bone => {
+                       if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
+                       base_rotations[bone.uuid] = bone.mesh.rotation.clone();
+               })
 
-               bones.forEach((bone, i) => {
+              bones.forEach((bone, i) => {
                         let startPoint = new FIK.V3(0,0,0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
                         let endPoint = new FIK.V3(0,0,0).copy(bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
 
@@ -696,68 +698,125 @@ class NullObjectAnimator extends BoneAnimator {
                         mesh.visible = false;
                 })
 
-		this.solver.update();
-		
-		let results = {};
-		bone_references.forEach((bone_ref, i) => {
-			let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
-			let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
-			bones[i].mesh.worldToLocal(start);
-			bones[i].mesh.worldToLocal(end);
+               if (target_original_quaternion) {
+                       base_rotations[target.uuid] = target.mesh.rotation.clone();
+               }
 
-			Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
-			let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
-			rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
+               this.solver.update();
 
-                       bone_ref.bone.mesh.rotation.x += rotation.x;
-                       bone_ref.bone.mesh.rotation.y += rotation.y;
-                       bone_ref.bone.mesh.rotation.z += rotation.z;
-                       this.clampRotation(bone_ref.bone);
-                       bone_ref.bone.mesh.updateMatrixWorld();
+               bone_references.forEach((bone_ref, i) => {
+                       let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
+                       let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
+                       bones[i].mesh.worldToLocal(start);
+                       bones[i].mesh.worldToLocal(end);
 
-			if (get_samples) {
-				results[bone_ref.bone.uuid] = {
-					euler: rotation,
-					array: [
-						Math.radToDeg(-rotation.x),
-						Math.radToDeg(-rotation.y),
-						Math.radToDeg(rotation.z),
-					]
-				}
-			}
-		})
+                       Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
+                       let rotation = Reusable.euler1;
+                       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
 
-		if (target_original_quaternion) {
-			let rotation = get_samples ? new THREE.Euler() : Reusable.euler1;
-			rotation.copy(target.mesh.rotation);
+                      bone_ref.bone.mesh.rotation.x += rotation.x;
+                      bone_ref.bone.mesh.rotation.y += rotation.y;
+                      bone_ref.bone.mesh.rotation.z += rotation.z;
 
-                       target.mesh.quaternion.copy(target_original_quaternion);
-                       let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
-                       target.mesh.quaternion.premultiply(q1.invert())
-                       this.clampRotation(target);
-                       target.mesh.updateMatrixWorld();
+                       Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
+                      this.clampRotation(bone_ref.bone);
+                      bone_ref.bone.mesh.updateMatrixWorld();
+                       Reusable.vec3.set(
+                               Reusable.euler2.x - bone_ref.bone.mesh.rotation.x,
+                               Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
+                               Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
+                       );
+                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+                               for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
+                                       let parent = bone_references[j].bone;
+                                       Reusable.euler2.copy(parent.mesh.rotation);
+                                       const share = j + 1;
+                                       parent.mesh.rotation.x += Reusable.vec3.x / share;
+                                       parent.mesh.rotation.y += Reusable.vec3.y / share;
+                                       parent.mesh.rotation.z += Reusable.vec3.z / share;
+                                       this.clampRotation(parent);
+                                       parent.mesh.updateMatrixWorld();
+                                       Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
+                                       Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
+                                       Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
+                               }
+                       }
+               })
 
-			rotation.x = target.mesh.rotation.x - rotation.x;
-			rotation.y = target.mesh.rotation.y - rotation.y;
-			rotation.z = target.mesh.rotation.z - rotation.z;
+               if (target_original_quaternion) {
+                       Reusable.euler2.copy(target.mesh.rotation);
 
-			if (get_samples) {
-				results[target.uuid] = {
-					euler: rotation,
-					array: [
-						Math.radToDeg(-rotation.x),
-						Math.radToDeg(-rotation.y),
-						Math.radToDeg(rotation.z),
-					]
-				}
-			}
-		}
+                      target.mesh.quaternion.copy(target_original_quaternion);
+                      let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
+                      target.mesh.quaternion.premultiply(q1.invert())
+                      this.clampRotation(target);
+                      target.mesh.updateMatrixWorld();
 
-		this.solver.clear();
-		this.chain.clear();
-		this.chain.lastTargetLocation.set(1e9, 0, 0);
+                       Reusable.vec3.set(
+                               Reusable.euler2.x - target.mesh.rotation.x,
+                               Reusable.euler2.y - target.mesh.rotation.y,
+                               Reusable.euler2.z - target.mesh.rotation.z
+                       );
+                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+                               for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
+                                       let parent = bone_references[j].bone;
+                                       Reusable.euler2.copy(parent.mesh.rotation);
+                                       const share = j + 1;
+                                       parent.mesh.rotation.x += Reusable.vec3.x / share;
+                                       parent.mesh.rotation.y += Reusable.vec3.y / share;
+                                       parent.mesh.rotation.z += Reusable.vec3.z / share;
+                                       this.clampRotation(parent);
+                                       parent.mesh.updateMatrixWorld();
+                                       Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
+                                       Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
+                                       Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
+                               }
+                       }
+               }
 
-		if (get_samples) return results;
+               let results = {};
+               if (get_samples) {
+                       bone_references.forEach(ref => {
+                               let base = base_rotations[ref.bone.uuid];
+                               let rot = ref.bone.mesh.rotation;
+                               let euler = new THREE.Euler(
+                                       rot.x - base.x,
+                                       rot.y - base.y,
+                                       rot.z - base.z
+                               );
+                               results[ref.bone.uuid] = {
+                                       euler,
+                                       array: [
+                                               Math.radToDeg(-euler.x),
+                                               Math.radToDeg(-euler.y),
+                                               Math.radToDeg(euler.z),
+                                       ]
+                               }
+                       });
+                       if (target_original_quaternion) {
+                               let base = base_rotations[target.uuid];
+                               let rot = target.mesh.rotation;
+                               let euler = new THREE.Euler(
+                                       rot.x - base.x,
+                                       rot.y - base.y,
+                                       rot.z - base.z
+                               );
+                               results[target.uuid] = {
+                                       euler,
+                                       array: [
+                                               Math.radToDeg(-euler.x),
+                                               Math.radToDeg(-euler.y),
+                                               Math.radToDeg(euler.z),
+                                       ]
+                               }
+                       }
+               }
+
+               this.solver.clear();
+               this.chain.clear();
+               this.chain.lastTargetLocation.set(1e9, 0, 0);
+
+               if (get_samples) return results;
 	}
         displayFrame(multiplier = 1) {
                if (!this.doRender()) return;
