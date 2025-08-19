@@ -710,13 +710,50 @@ class NullObjectAnimator extends BoneAnimator {
                        bones[i].mesh.worldToLocal(start);
                        bones[i].mesh.worldToLocal(end);
 
-                       Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
-                       let rotation = Reusable.euler1;
-                       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
+		       Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
 
-                      bone_ref.bone.mesh.rotation.x += rotation.x;
-                      bone_ref.bone.mesh.rotation.y += rotation.y;
-                      bone_ref.bone.mesh.rotation.z += rotation.z;
+		       const useIKClamp = !!(window.IKConstraints) && !!(bone_ref.bone && bone_ref.bone.rotation_limit_enabled);
+
+		       // If hinge lock is enabled, project the delta ABOUT THE HINGE AXIS in JOINT-LOCAL space
+		       if (useIKClamp && bone_ref.bone && bone_ref.bone.rotation_hinge_lock) {
+			       // 1) Determine hinge axis (local) from UI setting
+			       const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
+			       const hingeAxisLocal =
+				       keep === 0 ? new THREE.Vector3(1,0,0) :
+				       keep === 1 ? new THREE.Vector3(0,1,0) :
+						    new THREE.Vector3(0,0,1);
+
+			       // 2) Convert world-space delta -> joint-local delta
+			       const parentWorld = bone_ref.bone.mesh.parent.getWorldQuaternion(Reusable.quat2);
+			       const q_local = parentWorld.clone().invert().multiply(Reusable.quat1).multiply(parentWorld);
+
+			       // 3) Read limits on that hinge axis (deg -> rad)
+			       const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180,-180,-180];
+			       const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180,180,180];
+			       const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+			       const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+
+			       // 4) Project delta with hinge clamp and APPLY as local quaternion
+			       const q_clamped = IKConstraints.clampHinge(q_local, hingeAxisLocal, min, max);
+			       bone_ref.bone.mesh.quaternion.multiply(q_clamped);
+			       bone_ref.bone.mesh.rotation.setFromQuaternion(bone_ref.bone.mesh.quaternion, 'ZYX');
+
+		       } else if (useIKClamp) {
+			       // Fallback: keep Euler path (ball-like limits handled by clampRotation below)
+			       let rotation = Reusable.euler1;
+			       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
+			       bone_ref.bone.mesh.rotation.x += rotation.x;
+			       bone_ref.bone.mesh.rotation.y += rotation.y;
+			       bone_ref.bone.mesh.rotation.z += rotation.z;
+
+		       } else {
+			       // No constraints available: original behaviour
+			       let rotation = Reusable.euler1;
+			       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
+			       bone_ref.bone.mesh.rotation.x += rotation.x;
+			       bone_ref.bone.mesh.rotation.y += rotation.y;
+			       bone_ref.bone.mesh.rotation.z += rotation.z;
+		       }
 
                        Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
                       this.clampRotation(bone_ref.bone);
