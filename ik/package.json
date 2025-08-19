@@ -1,0 +1,15 @@
+{
+  "name": "blockbench-ik-harness",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Deterministic IK testing harness (Jest + fast-check + three).",
+  "scripts": {
+    "test": "jest --runInBand",
+    "heatmap": "node src/solvers/heatmap.js"
+  },
+  "devDependencies": {
+    "fast-check": "^3.17.1",
+    "jest": "^29.7.0",
+    "three": "^0.161.0"
+  }
+}
