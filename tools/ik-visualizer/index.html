@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IK Workspace Visualizer — One Pager</title>
+  <style>
+    :root {
+      --bg: #0f1115; --panel:#141821; --ink:#e6e9ef; --muted:#9aa4b2;
+      --accent:#70e1a1; --danger:#ff5d6c; --grid:#202536; --notice:#1b2638;
+    }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif; }
+    .app { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; height: 100vh; }
+    .sidebar { background: var(--panel); border-right: 1px solid #1c2130; padding: 14px; overflow: auto; }
+    .header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .title { font-weight: 700; letter-spacing: 0.2px; }
+    .muted { color: var(--muted); }
+    .controls { display:grid; gap:10px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    label { font-size: 12px; color: var(--muted); min-width:110px; }
+    input[type="number"], select { width: 110px; background:#0e121a; color:var(--ink); border:1px solid #262c3f; border-radius:8px; padding:6px 8px; }
+    input[type="range"] { width: 100%; }
+    textarea { width: 100%; height: 220px; resize: vertical; background:#0e121a; color:#d7dde9; border:1px solid #262c3f; border-radius:10px; padding:10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; }
+    button { background:#1b2332; color:#eaf2ff; border:1px solid #2a334a; padding:8px 10px; border-radius:10px; cursor:pointer; }
+    button.primary { background: linear-gradient(180deg, #1e293b, #0f172a); border-color:#334155; }
+    button:hover { filter: brightness(1.1); }
+    .btn-row { display:flex; gap:8px; flex-wrap: wrap; }
+    .legend { display:grid; gap:8px; margin-top:8px; }
+    .bar { height: 10px; border-radius: 999px; background: linear-gradient(90deg, #00dd66, #ff3355); border:1px solid #282f42; }
+    .bar2{ height: 10px; border-radius: 999px; background: linear-gradient(90deg, hsl(220,90%,60%), hsl(320,90%,60%)); border:1px solid #282f42; }
+    .stats { background: #0e121a; border:1px solid #242b3f; border-radius:12px; padding:10px; display:grid; gap:6px; }
+    .viewer { position: relative; min-height: 100vh; }
+    #stage { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#0e121a; border:1px solid #2b3147; color:#cbd5e1; font-size:12px; }
+    .footer { color:#8b94a7; font-size:12px; margin-top:10px; }
+    .error { color:#ffd2d2; background:#331c1c; border:1px solid #5c2a2a; padding:8px; border-radius:8px; white-space: pre-wrap; }
+    .notice { color:#cde2ff; background: var(--notice); border:1px solid #2a3c57; padding:8px; border-radius:8px; white-space: pre-wrap; }
+    .tests { background:#0e121a; border:1px solid #2b3147; border-radius:12px; padding:10px; display:grid; gap:6px; }
+    .pass { color:#70e1a1; }
+    .fail { color:#ff8b94; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; border:1px solid #26304a; background:#0e121a; }
+    @media (max-width: 960px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .sidebar { height: auto; }
+      .viewer { min-height: calc(100vh - 16px); }
+    }
+  </style>
+
+  <!-- Import Map to resolve bare specifiers used by three's JSM modules -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="header">
+        <span class="title">IK Workspace Visualizer</span>
+        <span class="badge">one‑pager</span>
+      </div>
+      <div class="controls">
+        <div class="row"><label>Cube size</label><input id="cubeSize" type="number" step="0.5" value="12" /> <span class="muted">(edge length)</span></div>
+        <div class="row"><label>Steps/axis</label><input id="steps" type="number" step="1" value="24" /></div>
+        <div class="row"><label>ε (reach threshold)</label><input id="eps" type="number" step="0.01" value="0.05" /></div>
+        <div class="row"><label>Normalize</label>
+          <select id="normMode">
+            <option value="cube">by cube diagonal</option>
+            <option value="seen">by max seen distance</option>
+          </select>
+        </div>
+        <div class="row"><label>Point size</label><input id="ptSize" type="range" min="1" max="10" value="4" /></div>
+        <!-- Legacy view mode (kept so existing tests pass) -->
+        <div class="row"><label>View (legacy)</label>
+          <select id="viewMode">
+            <option value="both">Both</option>
+            <option value="distance">Distance only</option>
+            <option value="constraints">Constraints only</option>
+          </select>
+        </div>
+        <!-- New per‑category toggles -->
+        <div class="row"><label>Categories</label>
+          <span class="chip"><input id="chkReach" type="checkbox" checked /> <span>Reachable (≤ ε)</span></span>
+          <span class="chip"><input id="chkUnreach" type="checkbox" checked /> <span>Unreachable (&gt; ε)</span></span>
+          <span class="chip"><input id="chkCons" type="checkbox" checked /> <span>Constraint‑blocked</span></span>
+        </div>
+        <div class="row"><label>Preset</label>
+          <select id="preset">
+            <option value="toy">Toy sphere</option>
+            <option value="bb-ik">Blockbench IK adapter</option>
+          </select>
+          <button id="loadPreset">Load</button>
+          <span class="muted">loads into editor</span>
+        </div>
+        <div class="row"><label>Runtime</label>
+          <span id="rtBadge" class="chip">checking…</span>
+        </div>
+        <div class="btn-row">
+          <button id="run" class="primary">Run</button>
+          <button id="download">Download JSON</button>
+          <button id="toggleWire">Toggle Wireframe</button>
+          <button id="runTests">Run Tests</button>
+        </div>
+        <div id="error" class="error" style="display:none"></div>
+        <div id="notice" class="notice" style="display:none"></div>
+        <div>
+          <label>Evaluator code</label>
+          <textarea id="code"></textarea>
+        </div>
+        <div class="legend">
+          <div class="muted">Distance → color (green→red)</div>
+          <div class="bar"></div>
+          <div class="muted">Constraint‑blocked overlay → color (blue→magenta)</div>
+          <div class="bar2"></div>
+        </div>
+        <div class="stats" id="stats">
+          <div>Samples: <b id="samp">–</b></div>
+          <div>Reach ≤ ε: <b id="reach">–</b></div>
+          <div>Unreachable &gt; ε: <b id="unreach">–</b></div>
+          <div>Constraint‑blocked: <b id="blocked">–</b></div>
+          <div>Errors: <b id="errors">–</b></div>
+          <div>Mean distance: <b id="mean">–</b></div>
+        </div>
+        <div class="tests" id="testsBox" style="display:none"></div>
+        <div class="footer">Paste your own evaluator that returns <code>{ distance, constrained }</code> for each grid point.<br/>Origin = (0,0,0). Cube is centered at origin.</div>
+      </div>
+    </aside>
+    <main class="viewer">
+      <canvas id="stage"></canvas>
+    </main>
+  </div>
+<script>
+(function bridgeFromParentEarly(){
+  try {
+    const candidates = [window.parent, window.opener, window.top];
+    for (const p of candidates) {
+      if (!p || p === window) continue;
+      if (!('Group' in window) && p.Group) window.Group = p.Group;
+      if (!('Locator' in window) && p.Locator) window.Locator = p.Locator;
+      if (!('IKPreviewInstance' in window) && p.IKPreviewInstance) window.IKPreviewInstance = p.IKPreviewInstance;
+      if (!('THREE' in window) && p.THREE) window.THREE = p.THREE;
+    }
+  } catch(e) { /* cross-origin → ignore */ }
+})();
+</script>
+  <!-- ES Module using the import map above -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    function ensureBBGlobals(){
+  try {
+    const c = [window.parent, window.opener, window.top];
+    for (const p of c) {
+      if (!p || p === window) continue;
+      if (!window.Group && p.Group) window.Group = p.Group;
+      if (!window.Locator && p.Locator) window.Locator = p.Locator;
+      if (!window.IKPreviewInstance && p.IKPreviewInstance) window.IKPreviewInstance = p.IKPreviewInstance;
+      if (!window.THREE && p.THREE) window.THREE = p.THREE;
+    }
+  } catch(e){}
+  return !!(window && window.THREE && window.Group && window.Locator);
+}
+
+
+    // Expose THREE globally for any user-supplied code that expects window.THREE
+    window.THREE = THREE;
+
+    (() => {
+      // ---------- 3D Setup ----------
+      const canvas = document.getElementById('stage');
+      const viewerEl = document.querySelector('.viewer');
+      const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f1115);
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 1000);
+      camera.position.set(10, 10, 10);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+
+      const light = new THREE.HemisphereLight(0xffffff, 0x111122, 0.9);
+      scene.add(light);
+      scene.add(new THREE.AxesHelper(2));
+
+      // Wire cube showing bounds
+      let wire = null;
+      function drawWire(size) {
+        if (wire) scene.remove(wire);
+        const g = new THREE.BoxGeometry(size, size, size);
+        const m = new THREE.MeshBasicMaterial({wireframe:true, color:0x293247, transparent:true, opacity:0.35});
+        wire = new THREE.Mesh(g, m);
+        scene.add(wire);
+      }
+
+      // Resize
+      function onResize(){
+        const w = Math.max(1, viewerEl.clientWidth);
+        const h = Math.max(1, viewerEl.clientHeight);
+        renderer.setSize(w, h, false);
+        camera.aspect = w/h; camera.updateProjectionMatrix();
+      }
+      if ('ResizeObserver' in window) {
+        const observer = new ResizeObserver(onResize); observer.observe(viewerEl);
+      } else {
+        window.addEventListener('resize', onResize);
+      }
+      // Ensure layout is settled before first size calc
+      requestAnimationFrame(onResize);
+
+      // Animation loop
+      function tick(){ controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick); }
+      tick();
+
+      // ---------- UI Elements ----------
+      const codeEl = document.getElementById('code');
+      const runBtn = document.getElementById('run');
+      const dlBtn  = document.getElementById('download');
+      const wireBtn= document.getElementById('toggleWire');
+      const testsBtn= document.getElementById('runTests');
+      const cubeSizeEl = document.getElementById('cubeSize');
+      const stepsEl    = document.getElementById('steps');
+      const epsEl      = document.getElementById('eps');
+      const normModeEl = document.getElementById('normMode');
+      const ptSizeEl   = document.getElementById('ptSize');
+      const viewModeEl = document.getElementById('viewMode'); // legacy dropdown
+      const presetEl = document.getElementById('preset');
+      const loadPresetBtn = document.getElementById('loadPreset');
+      const chkReach = document.getElementById('chkReach');
+      const chkUnreach = document.getElementById('chkUnreach');
+      const chkCons = document.getElementById('chkCons');
+      const statSamp = document.getElementById('samp');
+      const statReach= document.getElementById('reach');
+      const statUnreach= document.getElementById('unreach');
+      const statBlocked=document.getElementById('blocked');
+      const statMean = document.getElementById('mean');
+      const errEl    = document.getElementById('error');
+      const noticeEl = document.getElementById('notice');
+      const testsBox = document.getElementById('testsBox');
+      const rtBadge = document.getElementById('rtBadge');
+
+      const defaultCode = `/**
+* Provide an evaluator for each grid sample.
+* Args:
+*   p: { x, y, z, i:[ix,iy,iz], step:[sx,sy,sz] }
+*   ctx: { epsilon }
+* Return:
+*   { distance: number, constrained: boolean }
+*
+* Example below: a toy “arm” that can reach a sphere of radius R.
+* Marks points with z < -1 as "constraint blocked".
+*/
+function evaluate(p, ctx) {
+  const R = 6; // max reach
+  const dCenter = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+  const distance = Math.max(0, dCenter - R); // 0 if on/inside sphere, grows outside
+  const constrained = (p.z < -1); // pretend lower half-space is blocked by constraints
+  return { distance, constrained };
+}`;
+      codeEl.value = defaultCode;
+
+      // --- Preset: Blockbench IK adapter evaluator ---
+      const ikAdapterCode = `/**
+* Blockbench IK adapter evaluator (improved).
+* Uses your real displayIK(false) and measures tip→target distance.
+* It wires null_object / ik_source / ik_target and preserves initial pose.
+*
+* Run this inside your Blockbench dev window so Group/Locator/THREE exist.
+*/
+function evaluate(p, ctx) {
+  // --- CONFIG ---
+  const SOURCE_NAME = 'pla_left_arm';       // chain root (e.g., shoulder)
+  const TARGET_NAME = 'pli_left_item';      // end-effector Group
+  const NULL_IS_LOCATOR = true;             // set false if your handle is a Group
+
+  // --- Runtime presence (fast path: do NOT throw per sample) ---
+  try {
+  const p = window.parent;
+  if (p && p!==window) {
+    if (!window.Group && p.Group) window.Group = p.Group;
+    if (!window.Locator && p.Locator) window.Locator = p.Locator;
+    if (!window.IKPreviewInstance && p.IKPreviewInstance) window.IKPreviewInstance = p.IKPreviewInstance;
+    if (!window.THREE && p.THREE) window.THREE = p.THREE;
+  }
+} catch(e){}
+const hasBB = !!(window && window.THREE && window.Group && window.Locator);
+if (!hasBB) {
+  return { distance: NaN, constrained: false, error: 'Blockbench runtime not detected' };
+}
+
+
+  // Helpers
+  function getGroupByName(n){ return Group.all.find(g=>g.name===n); }
+  function worldCenter(node){
+    if (!node) return new THREE.Vector3();
+    if (typeof node.getWorldCenter === 'function') return node.getWorldCenter(true);
+    if (node.mesh && typeof node.mesh.getWorldPosition === 'function') return node.mesh.getWorldPosition(new THREE.Vector3());
+    return new THREE.Vector3();
+  }
+  function setWorldPositionForNode(node, worldPos){
+    const obj3d = node.mesh || node;
+    if (!obj3d || !obj3d.parent) return;
+    obj3d.parent.updateMatrixWorld();
+    obj3d.position.copy(obj3d.parent.worldToLocal(worldPos.clone()));
+    obj3d.updateMatrixWorld(true);
+  }
+  function chainBonesBetween(source, target){
+    const bones=[]; let current=target.parent;
+    while (current && current !== source) { if (current instanceof Group) bones.push(current); current=current.parent; }
+    if (source instanceof Group) bones.push(source);
+    return bones.reverse();
+  }
+
+  // Resolve scene endpoints
+  const source = getGroupByName(SOURCE_NAME);
+  const target = getGroupByName(TARGET_NAME);
+  if (!source || !target) {
+    return { distance: NaN, constrained: false, error: 'SOURCE_NAME or TARGET_NAME not found' };
+  }
+
+  // Resolve the null handle – prefer one whose ik_target matches this target
+  let null_object = (NULL_IS_LOCATOR ? Locator.all : Group.all).find(n => n.ik_target === target.uuid);
+  if (!null_object) {
+    // Fallback to current selection
+    null_object = NULL_IS_LOCATOR ? (Locator.selected && Locator.selected[0]) : (Group.selected && Group.selected[0]);
+  }
+  if (!null_object) {
+    return { distance: NaN, constrained: false, error: 'null_object not found or not selected' };
+  }
+
+  // Compute desired world position for the sample relative to SOURCE origin
+  const origin = worldCenter(source);
+  const ikPos = new THREE.Vector3(origin.x + p.x, origin.y + p.y, origin.z + p.z);
+
+  // Snapshot state so each sample is independent
+  const bones = chainBonesBetween(source, target);
+  const restore = {
+    boneRot: bones.map(b => [b, b.mesh.rotation.clone()]),
+    targetRot: target.mesh && target.mesh.rotation ? target.mesh.rotation.clone() : null,
+    nullPos: null_object.mesh ? null_object.mesh.position.clone() : null,
+    nullQuat: null_object.mesh ? null_object.mesh.quaternion.clone() : null,
+    ikSource: null_object.ik_source,
+    ikTarget: null_object.ik_target,
+    ikEnabled: !!target.ik_enabled
+  };
+
+  // Ensure the solver will actually run for this pair
+  target.ik_enabled = true;
+  null_object.ik_source = source.uuid;
+  null_object.ik_target = target.uuid;
+
+  // Place the null handle at the sample location
+  setWorldPositionForNode(null_object, ikPos);
+
+  // Choose the host object that owns displayIK & clampRotation
+  let HOST = (window.IKPreviewInstance || null_object);
+  if (!HOST || typeof HOST.displayIK !== 'function') {
+    // Try nearby owners as a fallback
+    const candidate = [null_object, target, source].find(o => o && typeof o.displayIK === 'function');
+    if (candidate) HOST = candidate;
+  }
+  if (!HOST || typeof HOST.displayIK !== 'function') {
+    // restore and bail
+    for (let i=0;i<restore.boneRot.length;i++){ const [b, rot] = restore.boneRot[i]; b.mesh.rotation.copy(rot); b.mesh.updateMatrixWorld(); }
+    if (restore.targetRot && target.mesh) { target.mesh.rotation.copy(restore.targetRot); target.mesh.updateMatrixWorld(); }
+    if (null_object.mesh && restore.nullPos && restore.nullQuat) { null_object.mesh.position.copy(restore.nullPos); null_object.mesh.quaternion.copy(restore.nullQuat); null_object.mesh.updateMatrixWorld(); }
+    target.ik_enabled = restore.ikEnabled; null_object.ik_source = restore.ikSource; null_object.ik_target = restore.ikTarget;
+    return { distance: NaN, constrained: false, error: 'displayIK host not found' };
+  }
+
+  // Force displayIK to operate on *our* null_object
+  let unpatchGetElement = null;
+  if (typeof HOST.getElement === 'function') {
+    const origGet = HOST.getElement;
+    HOST.getElement = function(){ return null_object; };
+    unpatchGetElement = () => { HOST.getElement = origGet; };
+  }
+
+  // Wrap clampRotation to detect actual limit clamps
+  if (!HOST.__ikClampPatched && typeof HOST.clampRotation === 'function') {
+    const orig = HOST.clampRotation;
+    HOST.clampRotation = function(bone){
+      const before = bone.mesh.rotation.clone();
+      const out = orig.call(this, bone);
+      const after = bone.mesh.rotation;
+      if (Math.abs(before.x-after.x) > 1e-6 || Math.abs(before.y-after.y) > 1e-6 || Math.abs(before.z-after.z) > 1e-6) {
+        this.__ik_constrained_hit = true;
+      }
+      return out;
+    };
+    HOST.__ikClampPatched = true;
+  }
+
+  HOST.__ik_constrained_hit = false;
+  HOST.displayIK(false); // run real solver once
+
+  // Measure tip↔null in world space
+  const tip = (target.mesh && target.mesh.getWorldPosition) ? target.mesh.getWorldPosition(new THREE.Vector3()) : worldCenter(target);
+  const handle = worldCenter(null_object);
+  const dist = tip.distanceTo(handle);
+  const constrained = !(dist <= ctx.epsilon) && !!HOST.__ik_constrained_hit;
+
+  // Restore pose so samples remain independent
+  for (let i=0;i<restore.boneRot.length;i++){ const [b, rot] = restore.boneRot[i]; b.mesh.rotation.copy(rot); b.mesh.updateMatrixWorld(); }
+  if (restore.targetRot && target.mesh) { target.mesh.rotation.copy(restore.targetRot); target.mesh.updateMatrixWorld(); }
+  if (null_object.mesh && restore.nullPos && restore.nullQuat) {
+    null_object.mesh.position.copy(restore.nullPos);
+    null_object.mesh.quaternion.copy(restore.nullQuat);
+    null_object.mesh.updateMatrixWorld();
+  }
+  target.ik_enabled = restore.ikEnabled;
+  null_object.ik_source = restore.ikSource;
+  null_object.ik_target = restore.ikTarget;
+  if (unpatchGetElement) unpatchGetElement();
+
+  return { distance: dist, constrained };
+}`;
+
+      // -------- Sampling Budget (prevents allocation overflow) --------
+      const MAX_POINTS = 400_000; // hard ceiling per category (reachable+unreachable) combined
+      function effectiveSampling(steps, maxPts){
+        const total = steps*steps*steps;
+        if (total <= maxPts) return { stride: 1, stepsEff: steps, totalEff: total, downsample: false };
+        const stride = Math.ceil(Math.cbrt(total / maxPts));
+        const stepsEff = Math.max(2, Math.floor((steps - 1) / stride) + 1);
+        const totalEff = stepsEff * stepsEff * stepsEff;
+        return { stride, stepsEff, totalEff, downsample: true };
+      }
+
+      // ---------- Sampling & Rendering ----------
+      let pointsReach = null;   // reachable (≤ ε)
+      let pointsUnreach = null; // unreachable (> ε)
+      let pointsTwin = null;    // constraint overlay twins
+      let lastJSON = null;
+
+      function hsl(h, s, l){
+        return new THREE.Color().setHSL(h/360, s/100, l/100);
+      }
+      function greenRedColor(norm){
+        // norm in [0,1] → green (0) to red (1)
+        const h = 120 * (1 - Math.min(Math.max(norm, 0), 1));
+        return hsl(h, 90, 55);
+      }
+      function blueMagentaColor(norm){
+        const h = 220 + 100 * Math.min(Math.max(norm, 0), 1); // 220→320
+        return hsl(h, 90, 60);
+      }
+
+      function applyRenderMode(){
+        // default from legacy select
+        let showDist = (viewModeEl?.value === 'both' || viewModeEl?.value === 'distance');
+        let showConsLegacy = (viewModeEl?.value === 'both' || viewModeEl?.value === 'constraints');
+        // new per-category checkboxes override when present
+        const useChecks = (chkReach && chkUnreach && chkCons);
+        const showReach = useChecks ? chkReach.checked : showDist;
+        const showUnreach = useChecks ? chkUnreach.checked : showDist;
+        const showCons = useChecks ? chkCons.checked : showConsLegacy;
+        if (pointsReach) pointsReach.visible = !!showReach;
+        if (pointsUnreach) pointsUnreach.visible = !!showUnreach;
+        if (pointsTwin) pointsTwin.visible = !!showCons;
+      }
+
+      function compileEvaluator(source){
+        try {
+          const fn = new Function('THREE', 'return (function(){\n' + source + '\n; return evaluate; })();');
+          const evaluate = fn(THREE);
+          if (typeof evaluate !== 'function') throw new Error('No function named evaluate found. Define: function evaluate(p, ctx) { ... }');
+          return evaluate;
+        } catch (e) {
+          throw e;
+        }
+      }
+
+      function run(){
+        // Update runtime badge
+        const hasBB = ensureBBGlobals();
+        if (rtBadge) {
+          rtBadge.textContent = hasBB ? 'Blockbench: detected' : 'Blockbench: NOT detected';
+          rtBadge.style.borderColor = hasBB ? '#2a4d3a' : '#5c2a2a';
+          rtBadge.style.color = hasBB ? '#a7f3d0' : '#ffd2d2';
+        }
+        errEl.style.display = 'none';
+        noticeEl.style.display = 'none';
+        const size = parseFloat(cubeSizeEl.value);
+        const steps= Math.max(2, parseInt(stepsEl.value, 10));
+        const eps  = parseFloat(epsEl.value);
+        const half = size/2;
+
+        drawWire(size);
+
+        let evalFn;
+        try { evalFn = compileEvaluator(codeEl.value); }
+        catch(err) {
+          errEl.textContent = String(err.stack || err.message || err);
+          errEl.style.display = 'block';
+          return;
+        }
+
+        // Compute effective sampling under the budget
+        const eff = effectiveSampling(steps, MAX_POINTS);
+        const stepEff = size / (eff.stepsEff - 1);
+        if (eff.downsample) {
+          noticeEl.style.display = 'block';
+          noticeEl.textContent = `Requested ${steps}^3 samples exceeds budget. Downsampled to ${eff.stepsEff}^3 (≈ ${eff.totalEff.toLocaleString()} points).`;
+        }
+
+        const normMode = normModeEl.value; // 'cube' | 'seen'
+        const cubeDiag = Math.sqrt(size*size*3);
+        let normD = cubeDiag;
+        let maxSeen = 1e-9;
+
+        // If using 'seen' normalization, do a lightweight first pass to find max distance
+        if (normMode === 'seen') {
+          for (let iz=0; iz<eff.stepsEff; iz++){
+            const z = -half + iz*stepEff;
+            for (let iy=0; iy<eff.stepsEff; iy++){
+              const y = -half + iy*stepEff;
+              for (let ix=0; ix<eff.stepsEff; ix++){
+                const x = -half + ix*stepEff;
+                try {
+                  const out = evalFn({x,y,z,i:[ix,iy,iz], step:[stepEff,stepEff,stepEff]}, {epsilon: eps});
+                  const d = (typeof out?.distance === 'number' && isFinite(out.distance)) ? out.distance : NaN;
+              if (!isFinite(d)) { errorCount++; if (!firstErr && out && out.error) firstErr = out.error; }
+                  if (isFinite(d) && d > maxSeen) maxSeen = d;
+                } catch(e){ /* ignore */ }
+              }
+            }
+          }
+          normD = maxSeen || cubeDiag;
+        }
+
+        // Dynamic buffers per category to avoid oversized allocations
+        const posReachArr = []; const colReachArr = [];
+        const posUnreachArr = []; const colUnreachArr = [];
+        const posTwinArr = []; const colTwinArr = [];
+
+        let reachCount = 0, unreachCount = 0, blockedCount = 0, errorCount = 0; let firstErr = null;
+        let sumDist = 0;
+
+        // Single pass: classify and color
+        for (let iz=0; iz<eff.stepsEff; iz++){
+          const z = -half + iz*stepEff;
+          for (let iy=0; iy<eff.stepsEff; iy++){
+            const y = -half + iy*stepEff;
+            for (let ix=0; ix<eff.stepsEff; ix++){
+              const x = -half + ix*stepEff;
+              let out;
+              try {
+                out = evalFn({x,y,z,i:[ix,iy,iz], step:[stepEff,stepEff,stepEff]}, {epsilon: eps});
+              } catch(err) {
+                out = { distance: NaN, constrained: false, error: String(err) };
+              }
+              const d = (typeof out?.distance === 'number' && isFinite(out.distance)) ? out.distance : NaN;
+              const t = isFinite(d) ? Math.min(Math.max(d / (normD || 1), 0), 1) : 1;
+              const c = greenRedColor(t);
+              if (isFinite(d)) sumDist += d;
+              const reached = isFinite(d) && d <= eps;
+
+              if (reached) {
+                posReachArr.push(x, y, z);
+                colReachArr.push(c.r, c.g, c.b);
+                reachCount++;
+              } else {
+                posUnreachArr.push(x, y, z);
+                colUnreachArr.push(c.r, c.g, c.b);
+                unreachCount++;
+                if (out?.constrained) {
+                  // offset twin for constraint-blocked
+                  posTwinArr.push(x + (stepEff*0.3), y, z);
+                  const c2 = blueMagentaColor(t);
+                  colTwinArr.push(c2.r, c2.g, c2.b);
+                  blockedCount++;
+                }
+              }
+            }
+          }
+        }
+
+        // Build / update point clouds
+        const sizePx = parseFloat(ptSizeEl.value) / 100;
+
+        if (pointsReach) { scene.remove(pointsReach); pointsReach.geometry.dispose(); pointsReach.material.dispose(); }
+        if (posReachArr.length) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posReachArr), 3));
+          g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colReachArr), 3));
+          pointsReach = new THREE.Points(g, new THREE.PointsMaterial({ size: sizePx, vertexColors: true }));
+          scene.add(pointsReach);
+        } else { pointsReach = null; }
+
+        if (pointsUnreach) { scene.remove(pointsUnreach); pointsUnreach.geometry.dispose(); pointsUnreach.material.dispose(); }
+        if (posUnreachArr.length) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posUnreachArr), 3));
+          g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colUnreachArr), 3));
+          pointsUnreach = new THREE.Points(g, new THREE.PointsMaterial({ size: sizePx, vertexColors: true }));
+          scene.add(pointsUnreach);
+        } else { pointsUnreach = null; }
+
+        if (pointsTwin) { scene.remove(pointsTwin); pointsTwin.geometry.dispose(); pointsTwin.material.dispose(); }
+        if (posTwinArr.length) {
+          const g2 = new THREE.BufferGeometry();
+          g2.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posTwinArr), 3));
+          g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colTwinArr), 3));
+          pointsTwin = new THREE.Points(g2, new THREE.PointsMaterial({ size: sizePx, vertexColors: true, opacity: 0.95, transparent: true }));
+          scene.add(pointsTwin);
+        } else { pointsTwin = null; }
+
+        // Apply view mode
+        applyRenderMode();
+
+        const total = eff.totalEff;
+        // Stats
+        statSamp.textContent = total.toLocaleString();
+        statReach.textContent = `${((reachCount/total)*100).toFixed(1)}%`;
+        statUnreach.textContent = `${((unreachCount/total)*100).toFixed(1)}%`;
+        statBlocked.textContent = `${((blockedCount/total)*100).toFixed(1)}%`;
+        document.getElementById('errors').textContent = `${((errorCount/total)*100).toFixed(1)}%`;
+        statMean.textContent = (sumDist/total).toFixed(4);
+
+        if (errorCount === total) {
+          noticeEl.style.display = 'block';
+          noticeEl.textContent = firstErr ? `All samples failed. Example error: ${firstErr}` : 'All samples returned invalid distances (likely wrong runtime).';
+        } else if (errorCount > total * 0.25) {
+          noticeEl.style.display = 'block';
+          noticeEl.textContent = firstErr ? `Many samples failed. Example error: ${firstErr}` : 'Many samples returned invalid distances.';
+        }
+
+        // Save JSON snapshot for download
+        lastJSON = {
+          config: { size, steps_requested: steps, steps_effective: eff.stepsEff, eps, normMode },
+          summary: {
+            samples: total,
+            reachable_rate: reachCount/total,
+            unreachable_rate: unreachCount/total,
+            constraint_blocked_rate: blockedCount/total,
+            mean_distance: sumDist/total,
+            downsampled: eff.downsample,
+            stride: eff.downsample ? eff.stride : 1
+          }
+        };
+      }
+
+      runBtn.addEventListener('click', run);
+      // Load preset into editor
+      if (loadPresetBtn) {
+        loadPresetBtn.addEventListener('click', () => {
+          if (!presetEl) return;
+          codeEl.value = (presetEl.value === 'bb-ik') ? ikAdapterCode : defaultCode;
+        });
+      }
+      dlBtn.addEventListener('click', () => {
+        if (!lastJSON) return;
+        const blob = new Blob([JSON.stringify(lastJSON, null, 2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'ik_workspace.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      wireBtn.addEventListener('click', () => { if (wire) wire.visible = !wire.visible; });
+
+      // -------- Tests (existing + more) --------
+      function runTests(){
+        testsBox.style.display = 'block';
+        testsBox.innerHTML = '<b>Self‑tests</b><br/>';
+        const cases = [];
+        const evalFn = compileEvaluator(codeEl.value);
+        // Existing tests (unchanged)
+        cases.push({name:'center', out: evalFn({x:0,y:0,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05}), expect:(o)=>o && o.distance===0 && !o.constrained});
+        const t2 = evalFn({x:10,y:0,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05});
+        cases.push({name:'far +X', out: t2, expect:(o)=>o && o.distance>0});
+        const t3 = evalFn({x:0,y:0,z:-2,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05});
+        cases.push({name:'constraint plane', out: t3, expect:(o)=>o && o.constrained===true});
+        // Added tests
+        cases.push({name:'on sphere surface', out: evalFn({x:6,y:0,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05}), expect:(o)=>o && o.distance===0 && !o.constrained});
+        cases.push({name:'above constraint plane', out: evalFn({x:0,y:0,z:-0.5,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05}), expect:(o)=>o && o.constrained===false});
+        cases.push({name:'inside sphere (3,3,0)', out: evalFn({x:3,y:3,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05}), expect:(o)=>o && o.distance===0});
+        cases.push({name:'far +Y', out: evalFn({x:0,y:10,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:0.05}), expect:(o)=>o && o.distance>0});
+        // Category classification
+        const eps = 0.05;
+        cases.push({name:'classify reachable', out:(() => { const o = evalFn({x:0,y:0,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:eps}); return (o.distance <= eps); })(), expect:(v)=> v === true});
+        cases.push({name:'classify unreachable', out:(() => { const o = evalFn({x:10,y:0,z:0,i:[0,0,0],step:[1,1,1]}, {epsilon:eps}); return (o.distance > eps); })(), expect:(v)=> v === true});
+
+        // Render mode toggles (legacy + new)
+        const savedMode = viewModeEl.value;
+        viewModeEl.value = 'distance'; applyRenderMode();
+        cases.push({name:'legacy view distance only', out:{reach: !!pointsReach && pointsReach.visible, unreach: !!pointsUnreach && pointsUnreach.visible, twin: !!pointsTwin && pointsTwin.visible}, expect:(o)=> o && o.reach===true && o.unreach===true});
+        viewModeEl.value = 'constraints'; applyRenderMode();
+        cases.push({name:'legacy view constraints only', out:{reach: !!pointsReach && pointsReach.visible, unreach: !!pointsUnreach && pointsUnreach.visible, twin: !!pointsTwin && pointsTwin.visible}, expect:(o)=> o && o.twin===true && !o.reach && !o.unreach});
+        viewModeEl.value = savedMode; applyRenderMode();
+
+        const savedChecks = [chkReach.checked, chkUnreach.checked, chkCons.checked];
+        chkReach.checked = true; chkUnreach.checked = false; chkCons.checked = false; applyRenderMode();
+        cases.push({name:'checkbox reach only', out:{reach: !!pointsReach && pointsReach.visible, unreach: !!pointsUnreach && pointsUnreach.visible, twin: !!pointsTwin && pointsTwin.visible}, expect:(o)=> o && o.reach===true && !o.unreach && !o.twin});
+        [chkReach.checked, chkUnreach.checked, chkCons.checked] = savedChecks; applyRenderMode();
+
+        const ul = document.createElement('ul');
+        ul.style.margin = '6px 0 0 16px';
+        for (const c of cases){
+          const li = document.createElement('li');
+          const ok = !!c.expect(c.out);
+          li.innerHTML = `${ok?'<span class="pass">✔</span>':'<span class="fail">✖</span>'} <b>${c.name}</b> — result: <code>${JSON.stringify(c.out)}</code>`;
+          ul.appendChild(li);
+        }
+        testsBox.appendChild(ul);
+      }
+
+      // Event wiring
+      [viewModeEl, chkReach, chkUnreach, chkCons].forEach(el => el && el.addEventListener('change', applyRenderMode));
+      runBtn.addEventListener('click', run);
+      testsBtn.addEventListener('click', runTests);
+      dlBtn.addEventListener('click', () => {
+        if (!lastJSON) return;
+        const blob = new Blob([JSON.stringify(lastJSON, null, 2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'ik_workspace.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      wireBtn.addEventListener('click', () => { if (wire) wire.visible = !wire.visible; });
+
+      // Initial
+      drawWire(parseFloat(cubeSizeEl.value));
+      // Show initial runtime status, but do not run heavy sampling until user clicks
+      (function initBadge(){
+        const hasBB = ensureBBGlobals();
+        if (rtBadge) {
+          rtBadge.textContent = hasBB ? 'Blockbench: detected' : 'Blockbench: NOT detected';
+          rtBadge.style.borderColor = hasBB ? '#2a4d3a' : '#5c2a2a';
+          rtBadge.style.color = hasBB ? '#a7f3d0' : '#ffd2d2';
+        }
+      })();
+    })();
+  </script>
+
+  <script>
+    // Helpful message for environments without ES Modules / import maps
+    try {
+      const supportsModule = 'noModule' in HTMLScriptElement.prototype;
+      if (!supportsModule) throw new Error();
+    } catch(e) {
+      const el = document.getElementById('error');
+      el.style.display = 'block';
+      el.textContent = 'Your browser/environment does not support ES Modules/import maps. Please use a modern Chromium/Firefox/Safari.';
+    }
+  </script>
+</body>
+</html>

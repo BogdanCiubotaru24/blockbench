@@ -140,6 +140,7 @@
 		"@electron/remote": "^2.1.2",
 		"electron-color-picker": "^0.2.0",
 		"electron-updater": "^6.3.4",
-		"gifenc": "^1.0.3"
+		"gifenc": "^1.0.3",
+		"three": "^0.179.1"
 	}
 }
