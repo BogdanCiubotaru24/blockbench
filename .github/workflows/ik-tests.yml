@@ -1,0 +1,18 @@
+name: IK Tests
+on: [push, pull_request]
+jobs:
+  ik:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: cd ik && npm ci
+      - run: cd ik && npm test
+      - run: cd ik && npm run heatmap
+      - name: Upload IK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ik-artifacts
+          path: ik/out/**
