@@ -64,7 +64,7 @@ class GeneralAnimator {
 		if (typeof time !== 'number') time = Timeline.time;
 		var keyframes = [];
 		if (undo) {
-			Undo.initEdit({keyframes})
+			Undo.initEdit({ keyframes })
 		}
 		var keyframe = new Keyframe({
 			channel: channel,
@@ -102,7 +102,7 @@ class GeneralAnimator {
 	}
 	getOrMakeKeyframe(channel) {
 		let before, result;
-		let epsilon = Timeline.getStep()/2 || 0.01;
+		let epsilon = Timeline.getStep() / 2 || 0.01;
 		let has_before = false;
 
 		for (let kf of this[channel]) {
@@ -118,7 +118,7 @@ class GeneralAnimator {
 		if (settings.auto_keyframe.value && Timeline.snapTime(Timeline.time) != 0 && !before && !has_before) {
 			new_keyframe = this.createKeyframe({}, 0, channel, false, false);
 		}
-		return {before, result, new_keyframe};
+		return { before, result, new_keyframe };
 	}
 	showContextMenu(event) {
 		Prop.active_panel = 'timeline'
@@ -149,13 +149,13 @@ class GeneralAnimator {
 			}
 			if (offset + el.clientHeight > scroll_top + height) {
 				$(timeline).animate({
-					scrollTop: offset - (height-el.clientHeight-20)
+					scrollTop: offset - (height - el.clientHeight - 20)
 				}, 200);
 			}
 		}
 	}
 }
-GeneralAnimator.addChannel = function(channel, options) {
+GeneralAnimator.addChannel = function (channel, options) {
 	this.prototype.channels[channel] = {
 		name: options.name || channel,
 		transform: options.transform || false,
@@ -164,16 +164,16 @@ GeneralAnimator.addChannel = function(channel, options) {
 	}
 	ModelProject.all.forEach(project => {
 		if (!project.animations)
-		project.animations.forEach(animation => {
-			animation.animators.forEach(animator => {
-				if (animator instanceof this && !animator[channel]) {
-					Vue.set(animator, channel, []);
-					if (this.prototype.channels[channel].mutable) {
-						Vue.set(animator.muted, channel, false);
+			project.animations.forEach(animation => {
+				animation.animators.forEach(animator => {
+					if (animator instanceof this && !animator[channel]) {
+						Vue.set(animator, channel, []);
+						if (this.prototype.channels[channel].mutable) {
+							Vue.set(animator.muted, channel, false);
+						}
 					}
-				}
+				})
 			})
-		})
 	})
 	Timeline.vue.$forceUpdate();
 }
@@ -238,7 +238,7 @@ class BoneAnimator extends GeneralAnimator {
 			});
 		}
 		super.select();
-		
+
 		if (this[Toolbox.selected.animation_channel] && (Timeline.selected.length == 0 || Timeline.selected[0].animator != this) && !Blockbench.hasFlag('loading_selection_save')) {
 			var nearest;
 			this[Toolbox.selected.animation_channel].forEach(kf => {
@@ -295,7 +295,7 @@ class BoneAnimator extends GeneralAnimator {
 					let e = keyframe.channel == 'scale' ? 1e4 : 1e2
 					ref.forEach((r, a) => {
 						if (!isNaN(r)) {
-							ref[a] = Math.round(parseFloat(r)*e)/e
+							ref[a] = Math.round(parseFloat(r) * e) / e
 						}
 					})
 				}
@@ -352,15 +352,15 @@ class BoneAnimator extends GeneralAnimator {
 				})
 			}
 		}
-                if (this.rotation_global) {
-                        let quat = bone.parent.getWorldQuaternion(Reusable.quat1);
-                        quat.invert();
-                        bone.quaternion.premultiply(quat);
+		if (this.rotation_global) {
+			let quat = bone.parent.getWorldQuaternion(Reusable.quat1);
+			quat.invert();
+			bone.quaternion.premultiply(quat);
 
-                }
-               this.clampRotation();
-               return this;
-       }
+		}
+		this.clampRotation();
+		return this;
+	}
 	displayPosition(arr, multiplier = 1) {
 		var bone = this.group.mesh
 		if (arr) {
@@ -370,54 +370,54 @@ class BoneAnimator extends GeneralAnimator {
 		}
 		return this;
 	}
-        displayScale(arr, multiplier = 1) {
-                if (!arr) return this;
-                var bone = this.group.mesh;
-                bone.scale.x *= (1 + (arr[0] - 1) * multiplier) || 0.00001;
-                bone.scale.y *= (1 + (arr[1] - 1) * multiplier) || 0.00001;
-                bone.scale.z *= (1 + (arr[2] - 1) * multiplier) || 0.00001;
-                return this;
-        }
-      clampRotation(group) {
-               group = group || this.getGroup();
-               if (!group || !group.rotation_limit_enabled) return;
-               const min = Array.isArray(group.rotation_limit_min) ? group.rotation_limit_min : [-180, -180, -180];
-               const max = Array.isArray(group.rotation_limit_max) ? group.rotation_limit_max : [180, 180, 180];
-               const hingeLock = !!group.rotation_hinge_lock;
-               const keep = Math.min(2, Math.max(0, Math.floor(group.rotation_hinge_axis || 0)));
-               const norm = d => { let r = d % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; };
-               const clamp = (v, a, b) => Math.max(Math.min(v, Math.max(a,b)), Math.min(a,b));
-               const mirror = (v, a, b) => {
-                       let minv = Math.min(a, b);
-                       let maxv = Math.max(a, b);
-                       if (v > maxv) v = maxv - (v - maxv);
-                       else if (v < minv) v = minv + (minv - v);
-                       return clamp(v, minv, maxv);
-               };
-               let mesh = group.mesh;
-               let r = [
-                       Math.radToDeg(mesh.rotation.x),
-                       Math.radToDeg(mesh.rotation.y),
-                       Math.radToDeg(mesh.rotation.z)
-               ].map(norm);
-               if (hingeLock) for (let i = 0; i < 3; i++) if (i !== keep) r[i] = 0;
-               r = [
-                       mirror(r[0], min[0], max[0]),
-                       mirror(r[1], min[1], max[1]),
-                       mirror(r[2], min[2], max[2])
-               ];
-               mesh.rotation.set(
-                       Math.degToRad(r[0]),
-                       Math.degToRad(r[1]),
-                       Math.degToRad(r[2])
-               );
-       }
-        interpolate(channel, allow_expression, axis) {
+	displayScale(arr, multiplier = 1) {
+		if (!arr) return this;
+		var bone = this.group.mesh;
+		bone.scale.x *= (1 + (arr[0] - 1) * multiplier) || 0.00001;
+		bone.scale.y *= (1 + (arr[1] - 1) * multiplier) || 0.00001;
+		bone.scale.z *= (1 + (arr[2] - 1) * multiplier) || 0.00001;
+		return this;
+	}
+	clampRotation(group) {
+		group = group || this.getGroup();
+		if (!group || !group.rotation_limit_enabled) return;
+		const min = Array.isArray(group.rotation_limit_min) ? group.rotation_limit_min : [-180, -180, -180];
+		const max = Array.isArray(group.rotation_limit_max) ? group.rotation_limit_max : [180, 180, 180];
+		const hingeLock = !!group.rotation_hinge_lock;
+		const keep = Math.min(2, Math.max(0, Math.floor(group.rotation_hinge_axis || 0)));
+		const norm = d => { let r = d % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; };
+		const clamp = (v, a, b) => Math.max(Math.min(v, Math.max(a, b)), Math.min(a, b));
+		const mirror = (v, a, b) => {
+			let minv = Math.min(a, b);
+			let maxv = Math.max(a, b);
+			if (v > maxv) v = maxv - (v - maxv);
+			else if (v < minv) v = minv + (minv - v);
+			return clamp(v, minv, maxv);
+		};
+		let mesh = group.mesh;
+		let r = [
+			Math.radToDeg(mesh.rotation.x),
+			Math.radToDeg(mesh.rotation.y),
+			Math.radToDeg(mesh.rotation.z)
+		].map(norm);
+		if (hingeLock) for (let i = 0; i < 3; i++) if (i !== keep) r[i] = 0;
+		r = [
+			mirror(r[0], min[0], max[0]),
+			mirror(r[1], min[1], max[1]),
+			mirror(r[2], min[2], max[2])
+		];
+		mesh.rotation.set(
+			Math.degToRad(r[0]),
+			Math.degToRad(r[1]),
+			Math.degToRad(r[2])
+		);
+	}
+	interpolate(channel, allow_expression, axis) {
 		let time = this.animation.time;
 		var before = false
 		var after = false
 		var result = false
-		let epsilon = 1/1200;
+		let epsilon = 1 / 1200;
 
 		function mapAxes(cb) {
 			if (!Animator._last_values[channel]) Animator._last_values[channel] = [0, 0, 0];
@@ -440,7 +440,7 @@ class BoneAnimator extends GeneralAnimator {
 				if (!before || keyframe.time > before.time) {
 					before = keyframe
 				}
-			} else  {
+			} else {
 				if (!after || keyframe.time < after.time) {
 					after = keyframe
 				}
@@ -462,7 +462,7 @@ class BoneAnimator extends GeneralAnimator {
 		} else {
 			let no_interpolations = Blockbench.hasFlag('no_interpolations')
 			let alpha = Math.getLerp(before.time, after.time, time)
-			let {linear, step, catmullrom, bezier} = Keyframe.interpolation;
+			let { linear, step, catmullrom, bezier } = Keyframe.interpolation;
 
 			if (no_interpolations || (
 				before.interpolation === linear &&
@@ -477,8 +477,8 @@ class BoneAnimator extends GeneralAnimator {
 
 				let sorted = this[channel].slice().sort((kf1, kf2) => (kf1.time - kf2.time));
 				let before_index = sorted.indexOf(before);
-				let before_plus = sorted[before_index-1];
-				let after_plus = sorted[before_index+2];
+				let before_plus = sorted[before_index - 1];
+				let after_plus = sorted[before_index + 2];
 				if (this.animation.loop == 'loop' && sorted.length >= 3) {
 					if (!before_plus) before_plus = sorted.at(-2);
 					if (!after_plus) after_plus = sorted[1];
@@ -494,7 +494,7 @@ class BoneAnimator extends GeneralAnimator {
 		if (result && result instanceof Keyframe) {
 			let keyframe = result
 			let method = allow_expression ? 'get' : 'calc'
-			let dp_index = (keyframe.time > time || Math.epsilon(keyframe.time, time, epsilon)) ? 0 : keyframe.data_points.length-1;
+			let dp_index = (keyframe.time > time || Math.epsilon(keyframe.time, time, epsilon)) ? 0 : keyframe.data_points.length - 1;
 
 			return mapAxes(axis => keyframe[method](axis, dp_index));
 		}
@@ -511,7 +511,7 @@ class BoneAnimator extends GeneralAnimator {
 	}
 	applyAnimationPreset(preset) {
 		let keyframes = [];
-		Undo.initEdit({keyframes});
+		Undo.initEdit({ keyframes });
 		let current_time = Timeline.snapTime(Timeline.time);
 		for (let channel in this.channels) {
 			let timeline = preset[channel];
@@ -519,12 +519,14 @@ class BoneAnimator extends GeneralAnimator {
 				let data = {};
 				let value = timeline[timecode];
 				if (value instanceof Array) {
-					data = {x: value[0], y: value[1], z: value[2]};
+					data = { x: value[0], y: value[1], z: value[2] };
 				} else if (value.pre) {
-					data = {data_points: [
-						{x: value.pre[0], y: value.pre[1], z: value.pre[2]},
-						{x: value.post[0], y: value.post[1], z: value.post[2]},
-					]}
+					data = {
+						data_points: [
+							{ x: value.pre[0], y: value.pre[1], z: value.pre[2] },
+							{ x: value.post[0], y: value.post[1], z: value.post[2] },
+						]
+					}
 				} else {
 					data = {
 						x: value.post[0], y: value.post[1], z: value.post[2],
@@ -544,30 +546,30 @@ class BoneAnimator extends GeneralAnimator {
 		return this;
 	}
 }
-	BoneAnimator.prototype.type = 'bone';
-	BoneAnimator.prototype.channels = {
-		rotation: {name: tl('timeline.rotation'), mutable: true, transform: true, max_data_points: 2},
-		position: {name: tl('timeline.position'), mutable: true, transform: true, max_data_points: 2},
-		scale: {name: tl('timeline.scale'), mutable: true, transform: true, max_data_points: 2},
-	}
-	Group.animator = BoneAnimator;
-	BoneAnimator.prototype.menu = new Menu('bone_animator', [
-		new MenuSeparator('settings'),
-		{
-			id: 'rotation_global',
-			name: 'menu.animator.rotation_global',
-			condition: animator => animator.type == 'bone',
-			icon: (animator) => animator.rotation_global,
-			click(animator) {
-				Undo.initEdit({animations: [Animation.selected]});
-				animator.rotation_global = !animator.rotation_global;
-				Undo.finishEdit('Toggle rotation in global space');
-				Animator.preview();
-			}
-		},
-		new MenuSeparator('presets'),
-		'apply_animation_preset'
-	])
+BoneAnimator.prototype.type = 'bone';
+BoneAnimator.prototype.channels = {
+	rotation: { name: tl('timeline.rotation'), mutable: true, transform: true, max_data_points: 2 },
+	position: { name: tl('timeline.position'), mutable: true, transform: true, max_data_points: 2 },
+	scale: { name: tl('timeline.scale'), mutable: true, transform: true, max_data_points: 2 },
+}
+Group.animator = BoneAnimator;
+BoneAnimator.prototype.menu = new Menu('bone_animator', [
+	new MenuSeparator('settings'),
+	{
+		id: 'rotation_global',
+		name: 'menu.animator.rotation_global',
+		condition: animator => animator.type == 'bone',
+		icon: (animator) => animator.rotation_global,
+		click(animator) {
+			Undo.initEdit({ animations: [Animation.selected] });
+			animator.rotation_global = !animator.rotation_global;
+			Undo.finishEdit('Toggle rotation in global space');
+			Animator.preview();
+		}
+	},
+	new MenuSeparator('presets'),
+	'apply_animation_preset'
+])
 
 class NullObjectAnimator extends BoneAnimator {
 	constructor(uuid, animation, name) {
@@ -603,7 +605,7 @@ class NullObjectAnimator extends BoneAnimator {
 			this.element.select();
 		}
 		GeneralAnimator.prototype.select.call(this);
-		
+
 		if (this[Toolbox.selected.animation_channel] && (Timeline.selected.length == 0 || Timeline.selected[0].animator != this)) {
 			var nearest;
 			this[Toolbox.selected.animation_channel].forEach(kf => {
@@ -635,10 +637,10 @@ class NullObjectAnimator extends BoneAnimator {
 		return this;
 	}
 	displayIK(get_samples) {
-               let null_object = this.getElement();
-               let target = [...Group.all, ...Locator.all].find(node => node.uuid == null_object.ik_target);
-               if (!null_object || !target) return;
-               if (target instanceof Group && !target.ik_enabled) return;
+		let null_object = this.getElement();
+		let target = [...Group.all, ...Locator.all].find(node => node.uuid == null_object.ik_target);
+		if (!null_object || !target) return;
+		if (target instanceof Group && !target.ik_enabled) return;
 
 		let bones = [];
 		let ik_target = new THREE.Vector3().copy(null_object.getWorldCenter(true));
@@ -653,222 +655,243 @@ class NullObjectAnimator extends BoneAnimator {
 		}
 		if (!source) return;
 		if (!target.isChildOf(source) && source != 'root') return;
+
 		let target_original_quaternion = null_object.lock_ik_target_rotation &&
 			target instanceof Group &&
 			target.mesh.getWorldQuaternion(new THREE.Quaternion());
 
-               while (current !== source) {
-                       if (current instanceof Group) bones.push(current);
-                       current = current.parent;
-               }
-               if (null_object.ik_source && source instanceof Group) {
-                       bones.push(source);
-               }
+		while (current !== source) {
+			if (current instanceof Group) bones.push(current);
+			current = current.parent;
+		}
+		if (null_object.ik_source && source instanceof Group) {
+			bones.push(source);
+		}
 		if (!bones.length) return;
 		bones.reverse();
-		
-               let base_rotations = {};
-               bones.forEach(bone => {
-                       if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
-                       base_rotations[bone.uuid] = bone.mesh.rotation.clone();
-               })
 
-              bones.forEach((bone, i) => {
-                        let startPoint = new FIK.V3(0,0,0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
-                        let endPoint = new FIK.V3(0,0,0).copy(bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
+		let base_rotations = {};
+		bones.forEach(bone => {
+			if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
+			base_rotations[bone.uuid] = bone.mesh.rotation.clone();
+		});
 
-                        let ik_bone = new FIK.Bone3D(startPoint, endPoint);
-                        this.chain.addBone(ik_bone);
+		bones.forEach((bone, i) => {
+			let startPoint = new FIK.V3(0, 0, 0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
+			let endPoint = new FIK.V3(0, 0, 0).copy(bones[i + 1] ? bones[i + 1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false));
+			let ik_bone = new FIK.Bone3D(startPoint, endPoint);
+			this.chain.addBone(ik_bone);
 
 			bone_references.push({
 				bone,
+				// direction from this bone to its child/target in REST space (already normalized)
 				last_diff: new THREE.Vector3(
-					(bones[i+1] ? bones[i+1] : target).origin[0] - bone.origin[0],
-					(bones[i+1] ? bones[i+1] : target).origin[1] - bone.origin[1],
-					(bones[i+1] ? bones[i+1] : target).origin[2] - bone.origin[2]
+					(bones[i + 1] ? bones[i + 1] : target).origin[0] - bone.origin[0],
+					(bones[i + 1] ? bones[i + 1] : target).origin[1] - bone.origin[1],
+					(bones[i + 1] ? bones[i + 1] : target).origin[2] - bone.origin[2]
 				).normalize()
-                        })
-                })
-                // Lower the distance threshold so the solver continues bending
-                // the chain even when the IK target is very close to the limb.
-                this.chain.solveDistanceThreshold = 0;
+			});
+		});
 
-                this.solver.add(this.chain, ik_target , true);
-                this.solver.meshChains[0].forEach(mesh => {
-                        mesh.visible = false;
-                })
+		// Lower the distance threshold so the solver continues bending the chain even when the IK target is very close
+		this.chain.solveDistanceThreshold = 0;
+		this.solver.add(this.chain, ik_target, true);
+		this.solver.meshChains[0].forEach(mesh => { mesh.visible = false; });
 
-               if (target_original_quaternion) {
-                       base_rotations[target.uuid] = target.mesh.rotation.clone();
-               }
+		if (target_original_quaternion) {
+			base_rotations[target.uuid] = target.mesh.rotation.clone();
+		}
 
-               this.solver.update();
+		this.solver.update();
+		let __posErr = 0;
+		{
+			const chain0 = this.solver.chains[0];
+			const last = chain0 ? chain0.bones[chain0.bones.length - 1] : null;
+			if (last) __posErr = new THREE.Vector3().copy(last.end).distanceTo(ik_target);
+		}
 
-               bone_references.forEach((bone_ref, i) => {
-                       let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
-                       let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
-                       bones[i].mesh.worldToLocal(start);
-                       bones[i].mesh.worldToLocal(end);
+		// METRICS: compute end-effector error in world space before clearing the solver
 
-		       Reusable.quat1.setFromUnitVectors(bone_ref.last_diff, end.sub(start).normalize());
+		bone_references.forEach((bone_ref, i) => {
+			// --- solver gives us world-space segment; bring to THIS bone's local space ---
+			let start = Reusable.vec1.copy(this.solver.chains[0].bones[i].start);
+			let end = Reusable.vec2.copy(this.solver.chains[0].bones[i].end);
+			bones[i].mesh.worldToLocal(start);
+			bones[i].mesh.worldToLocal(end);
 
-		       const useIKClamp = !!(window.IKConstraints) && !!(bone_ref.bone && bone_ref.bone.rotation_limit_enabled);
+			// LOCAL directions
+			const v_ref_local = bone_ref.last_diff;           // rest/previous dir (already normalized)
+			const v_tar_local = end.sub(start).normalize();   // target dir from solver in local
 
-		       // If hinge lock is enabled, project the delta ABOUT THE HINGE AXIS in JOINT-LOCAL space
-		       if (useIKClamp && bone_ref.bone && bone_ref.bone.rotation_hinge_lock) {
-			       // 1) Determine hinge axis (local) from UI setting
-			       const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
-			       const hingeAxisLocal =
-				       keep === 0 ? new THREE.Vector3(1,0,0) :
-				       keep === 1 ? new THREE.Vector3(0,1,0) :
-						    new THREE.Vector3(0,0,1);
+			// LOCAL delta quaternion to rotate v_ref_local -> v_tar_local
+			Reusable.quat1.setFromUnitVectors(v_ref_local, v_tar_local); // delta_local
 
-			       // 2) Convert world-space delta -> joint-local delta
-			       const parentWorld = bone_ref.bone.mesh.parent.getWorldQuaternion(Reusable.quat2);
-			       const q_local = parentWorld.clone().invert().multiply(Reusable.quat1).multiply(parentWorld);
+			// Compose with current LOCAL rotation
+			const q_local = bone_ref.bone.mesh.quaternion; // THREE stores local quaternion
+			let q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
 
-			       // 3) Read limits on that hinge axis (deg -> rad)
-			       const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180,-180,-180];
-			       const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180,180,180];
-			       const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
-			       const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+			// Constraints
+			const limitsEnabled = !!(window.IKConstraints) &&
+				!!(bone_ref.bone && bone_ref.bone.rotation_limit_enabled);
+			const isHinge = !!(limitsEnabled && bone_ref.bone.rotation_hinge_lock);
 
-			       // 4) Project delta with hinge clamp and APPLY as local quaternion
-			       const q_clamped = IKConstraints.clampHinge(q_local, hingeAxisLocal, min, max);
-			       bone_ref.bone.mesh.quaternion.multiply(q_clamped);
-			       bone_ref.bone.mesh.rotation.setFromQuaternion(bone_ref.bone.mesh.quaternion, 'ZYX');
+			let q_new = q_new_unclamped;
 
-		       } else if (useIKClamp) {
-			       // Fallback: keep Euler path (ball-like limits handled by clampRotation below)
-			       let rotation = Reusable.euler1;
-			       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
-			       bone_ref.bone.mesh.rotation.x += rotation.x;
-			       bone_ref.bone.mesh.rotation.y += rotation.y;
-			       bone_ref.bone.mesh.rotation.z += rotation.z;
+			if (isHinge) {
+				// Hinge projection in JOINT-LOCAL
+				const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
+				const axisLocal =
+					keep === 0 ? new THREE.Vector3(1, 0, 0) :
+						keep === 1 ? new THREE.Vector3(0, 1, 0) :
+							new THREE.Vector3(0, 0, 1);
 
-		       } else {
-			       // No constraints available: original behaviour
-			       let rotation = Reusable.euler1;
-			       rotation.setFromQuaternion(Reusable.quat1, 'ZYX');
-			       bone_ref.bone.mesh.rotation.x += rotation.x;
-			       bone_ref.bone.mesh.rotation.y += rotation.y;
-			       bone_ref.bone.mesh.rotation.z += rotation.z;
-		       }
+				const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180, -180, -180];
+				const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180, 180, 180];
+				const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+				const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
 
-                       Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
-                      this.clampRotation(bone_ref.bone);
-                      bone_ref.bone.mesh.updateMatrixWorld();
-                       Reusable.vec3.set(
-                               Reusable.euler2.x - bone_ref.bone.mesh.rotation.x,
-                               Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
-                               Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
-                       );
+				// (Optional) small step cap about hinge axis to calm edges
+				const maxStep = Math.PI / 10; // ~18°
+				{
+					const axis = axisLocal;
+					const v = new THREE.Vector3(Reusable.quat1.x, Reusable.quat1.y, Reusable.quat1.z);
+					const signed = 2 * Math.atan2(v.dot(axis), Reusable.quat1.w);
+					const limited = THREE.MathUtils.clamp(signed, -maxStep, maxStep);
+					Reusable.quat1.setFromAxisAngle(axis, limited);
+					q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
+				}
 
-                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
-                               for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
-                                       let parent = bone_references[j].bone;
-                                       Reusable.euler2.copy(parent.mesh.rotation);
-                                       parent.mesh.rotation.x += Reusable.vec3.x;
-                                       parent.mesh.rotation.y += Reusable.vec3.y;
-                                       parent.mesh.rotation.z += Reusable.vec3.z;
-                                       this.clampRotation(parent);
-                                       parent.mesh.updateMatrixWorld();
-                                       Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
-                                       Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
-                                       Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
-                               }
-                       }
-               })
+				// Project ABSOLUTE local pose to hinge limits (like the harness)
+				q_new = IKConstraints.clampHinge(q_new_unclamped, axisLocal, min, max);
+			}
 
-               if (target_original_quaternion) {
-                       Reusable.euler2.copy(target.mesh.rotation);
+			// Write back LOCAL quaternion and sync Euler for UI
+			bone_ref.bone.mesh.quaternion.copy(q_new);
+			bone_ref.bone.mesh.rotation.setFromQuaternion(q_new, 'ZYX');
+			bone_ref.bone.mesh.updateMatrixWorld();
 
-                      target.mesh.quaternion.copy(target_original_quaternion);
-                      let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
-                      target.mesh.quaternion.premultiply(q1.invert())
-                      this.clampRotation(target);
-                      target.mesh.updateMatrixWorld();
+			// Keep legacy Euler clamp/back-prop ONLY for non-hinge joints
+			if (!isHinge) {
+				Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
+				this.clampRotation(bone_ref.bone);
+				bone_ref.bone.mesh.updateMatrixWorld();
 
-                       Reusable.vec3.set(
-                               Reusable.euler2.x - target.mesh.rotation.x,
-                               Reusable.euler2.y - target.mesh.rotation.y,
-                               Reusable.euler2.z - target.mesh.rotation.z
-                       );
-                       if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
-                               for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
-                                       let parent = bone_references[j].bone;
-                                       Reusable.euler2.copy(parent.mesh.rotation);
-                                       parent.mesh.rotation.x += Reusable.vec3.x;
-                                       parent.mesh.rotation.y += Reusable.vec3.y;
-                                       parent.mesh.rotation.z += Reusable.vec3.z;
-                                       this.clampRotation(parent);
-                                       parent.mesh.updateMatrixWorld();
-                                       Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
-                                       Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
-                                       Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
-                               }
-                       }
-               }
+				Reusable.vec3.set(
+					Reusable.euler2.x - bone_ref.bone.mesh.rotation.x,
+					Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
+					Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
+				);
 
-               let results = {};
-               if (get_samples) {
-                       bone_references.forEach(ref => {
-                               let base = base_rotations[ref.bone.uuid];
-                               let rot = ref.bone.mesh.rotation;
-                               let euler = new THREE.Euler(
-                                       rot.x - base.x,
-                                       rot.y - base.y,
-                                       rot.z - base.z
-                               );
-                               results[ref.bone.uuid] = {
-                                       euler,
-                                       array: [
-                                               Math.radToDeg(-euler.x),
-                                               Math.radToDeg(-euler.y),
-                                               Math.radToDeg(euler.z),
-                                       ]
-                               }
-                       });
-                       if (target_original_quaternion) {
-                               let base = base_rotations[target.uuid];
-                               let rot = target.mesh.rotation;
-                               let euler = new THREE.Euler(
-                                       rot.x - base.x,
-                                       rot.y - base.y,
-                                       rot.z - base.z
-                               );
-                               results[target.uuid] = {
-                                       euler,
-                                       array: [
-                                               Math.radToDeg(-euler.x),
-                                               Math.radToDeg(-euler.y),
-                                               Math.radToDeg(euler.z),
-                                       ]
-                               }
-                       }
-               }
+				if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+					for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
+						let parent = bone_references[j].bone;
+						Reusable.euler2.copy(parent.mesh.rotation);
+						parent.mesh.rotation.x += Reusable.vec3.x;
+						parent.mesh.rotation.y += Reusable.vec3.y;
+						parent.mesh.rotation.z += Reusable.vec3.z;
+						this.clampRotation(parent);
+						parent.mesh.updateMatrixWorld();
+						Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
+						Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
+						Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
+					}
+				}
+			}
+		});
 
-               this.solver.clear();
-               this.chain.clear();
-               this.chain.lastTargetLocation.set(1e9, 0, 0);
+		if (target_original_quaternion) {
+			Reusable.euler2.copy(target.mesh.rotation);
+			target.mesh.quaternion.copy(target_original_quaternion);
+			let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
+			target.mesh.quaternion.premultiply(q1.invert());
+			this.clampRotation(target);
+			target.mesh.updateMatrixWorld();
 
-               if (get_samples) return results;
+			Reusable.vec3.set(
+				Reusable.euler2.x - target.mesh.rotation.x,
+				Reusable.euler2.y - target.mesh.rotation.y,
+				Reusable.euler2.z - target.mesh.rotation.z
+			);
+			if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
+				for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
+					let parent = bone_references[j].bone;
+					Reusable.euler2.copy(parent.mesh.rotation);
+					parent.mesh.rotation.x += Reusable.vec3.x;
+					parent.mesh.rotation.y += Reusable.vec3.y;
+					parent.mesh.rotation.z += Reusable.vec3.z;
+					this.clampRotation(parent);
+					parent.mesh.updateMatrixWorld();
+					Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
+					Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
+					Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
+				}
+			}
+		}
+
+		let results = {};
+		if (get_samples) {
+			bone_references.forEach(ref => {
+				let base = base_rotations[ref.bone.uuid];
+				let rot = ref.bone.mesh.rotation;
+				let euler = new THREE.Euler(
+					rot.x - base.x,
+					rot.y - base.y,
+					rot.z - base.z
+				);
+				results[ref.bone.uuid] = {
+					euler,
+					array: [
+						Math.radToDeg(-euler.x),
+						Math.radToDeg(-euler.y),
+						Math.radToDeg(euler.z),
+					]
+				};
+			});
+			if (target_original_quaternion) {
+				let base = base_rotations[target.uuid];
+				let rot = target.mesh.rotation;
+				let euler = new THREE.Euler(
+					rot.x - base.x,
+					rot.y - base.y,
+					rot.z - base.z
+				);
+				results[target.uuid] = {
+					euler,
+					array: [
+						Math.radToDeg(-euler.x),
+						Math.radToDeg(-euler.y),
+						Math.radToDeg(euler.z),
+					]
+				};
+			}
+		}
+
+		this.solver.clear();
+		this.chain.clear();
+		this.chain.lastTargetLocation.set(1e9, 0, 0);
+
+		if (get_samples) {
+			// METRICS: attach summary; ok threshold can be tweaked
+			results.__metrics = { posErr: __posErr, ok: __posErr <= 1e-2 };
+			return results;
+		}
 	}
-        displayFrame(multiplier = 1) {
-               if (!this.doRender()) return;
-               const null_object = this.getElement();
 
-               if (!this.muted.position) {
-                       this.displayPosition(this.interpolate('position'), multiplier);
-                       if (null_object?.ik_target) this.displayIK();
-               }
-       }
+	displayFrame(multiplier = 1) {
+		if (!this.doRender()) return;
+		const null_object = this.getElement();
+
+		if (!this.muted.position) {
+			this.displayPosition(this.interpolate('position'), multiplier);
+			if (null_object?.ik_target) this.displayIK();
+		}
+	}
 }
-	NullObjectAnimator.prototype.type = 'null_object';
-	NullObjectAnimator.prototype.channels = {
-		position: {name: tl('timeline.position'), mutable: true, transform: true, max_data_points: 2},
-	}
-	NullObject.animator = NullObjectAnimator;
+NullObjectAnimator.prototype.type = 'null_object';
+NullObjectAnimator.prototype.channels = {
+	position: { name: tl('timeline.position'), mutable: true, transform: true, max_data_points: 2 },
+}
+NullObject.animator = NullObjectAnimator;
 
 class EffectAnimator extends GeneralAnimator {
 	constructor(animation) {
@@ -894,15 +917,15 @@ class EffectAnimator extends GeneralAnimator {
 				if (diff < 0) return;
 
 				let media = Timeline.playing_sounds.find(s => s.keyframe_id == kf.uuid);
-				if (diff >= 0 && diff < (1/30) * (Timeline.playback_speed/100) && !media) {
+				if (diff >= 0 && diff < (1 / 30) * (Timeline.playback_speed / 100) && !media) {
 					if (kf.data_points[0].file && !kf.cooldown) {
 						media = new Audio(kf.data_points[0].file);
 						media.keyframe_id = kf.uuid;
-						media.playbackRate = Math.clamp(Timeline.playback_speed/100, 0.1, 4.0);
-						media.volume = Math.clamp(settings.volume.value/100, 0, 1);
-						media.play().catch(() => {});
+						media.playbackRate = Math.clamp(Timeline.playback_speed / 100, 0.1, 4.0);
+						media.volume = Math.clamp(settings.volume.value / 100, 0, 1);
+						media.play().catch(() => { });
 						Timeline.playing_sounds.push(media);
-						media.onended = function() {
+						media.onended = function () {
 							Timeline.playing_sounds.remove(media);
 							Timeline.paused_sounds.safePush(media);
 						}
@@ -911,13 +934,13 @@ class EffectAnimator extends GeneralAnimator {
 						setTimeout(() => {
 							delete kf.cooldown;
 						}, 400)
-					} 
+					}
 				} else if (diff > 0 && media) {
 					if (Math.abs(media.currentTime - diff) > 0.18 && diff < media.duration) {
 						console.log('Resyncing sound')
 						// Resync
 						media.currentTime = Math.clamp(diff + 0.08, 0, media.duration);
-						media.playbackRate = Math.clamp(Timeline.playback_speed/100, 0.1, 4.0);
+						media.playbackRate = Math.clamp(Timeline.playback_speed / 100, 0.1, 4.0);
 					}
 				}
 			})
@@ -936,14 +959,14 @@ class EffectAnimator extends GeneralAnimator {
 								let i_here = i;
 								let anim_uuid = this.animation.uuid;
 								emitter = particle_effect.emitters[kf.uuid + i] = new Wintersky.Emitter(WinterskyScene, particle_effect.config);
-								
+
 								let old_variable_handler = emitter.Molang.variableHandler;
 								emitter.Molang.variableHandler = (key, params) => {
 									let curve_result = old_variable_handler.call(emitter, key, params);
 									if (curve_result !== undefined) return curve_result;
 									return Animator.MolangParser.variableHandler(key);
 								}
-								emitter.on('start', ({params}) => {
+								emitter.on('start', ({ params }) => {
 									let animation = Animation.all.find(a => a.uuid === anim_uuid);
 									let kf_now = animation?.animators.effects?.particle.find(kf2 => kf2.uuid == kf.uuid);
 									let data_point_now = kf_now && kf_now.data_points[i_here];
@@ -966,12 +989,12 @@ class EffectAnimator extends GeneralAnimator {
 						} else if (emitter && emitter.enabled) {
 							emitter.stop(true);
 						}
-					} 
+					}
 					i++;
 				}
 			})
 		}
-		
+
 		if (!this.muted.timeline) {
 			this.timeline.forEach(kf => {
 				if ((kf.time > this.last_displayed_time && kf.time <= this.animation.time) || Math.epsilon(kf.time, this.animation.time, 0.01)) {
@@ -990,13 +1013,13 @@ class EffectAnimator extends GeneralAnimator {
 					var diff = kf.time - this.animation.time;
 					if (diff < 0 && Timeline.waveforms[kf.data_points[0].file] && Timeline.waveforms[kf.data_points[0].file].duration > -diff) {
 						var media = new Audio(kf.data_points[0].file);
-						media.playbackRate = Math.clamp(Timeline.playback_speed/100, 0.1, 4.0);
-						media.volume = Math.clamp(settings.volume.value/100, 0, 1);
+						media.playbackRate = Math.clamp(Timeline.playback_speed / 100, 0.1, 4.0);
+						media.volume = Math.clamp(settings.volume.value / 100, 0, 1);
 						media.currentTime = -diff;
 						media.keyframe_id = kf.uuid;
-						media.play().catch(() => {});
+						media.play().catch(() => { });
 						Timeline.playing_sounds.push(media);
-						media.onended = function() {
+						media.onended = function () {
 							Timeline.playing_sounds.remove(media);
 							Timeline.paused_sounds.safePush(media);
 						}
@@ -1005,18 +1028,18 @@ class EffectAnimator extends GeneralAnimator {
 						setTimeout(() => {
 							delete kf.cooldown;
 						}, 400)
-					} 
+					}
 				}
 			})
 		}
 	}
 }
-	EffectAnimator.prototype.type = 'effect';
-	EffectAnimator.prototype.channels = {
-		particle: {name: tl('timeline.particle'), mutable: true, max_data_points: 1000},
-		sound: {name: tl('timeline.sound'), mutable: true, max_data_points: 1000},
-		timeline: {name: tl('timeline.timeline'), mutable: true, max_data_points: 1},
-	}
+EffectAnimator.prototype.type = 'effect';
+EffectAnimator.prototype.channels = {
+	particle: { name: tl('timeline.particle'), mutable: true, max_data_points: 1000 },
+	sound: { name: tl('timeline.sound'), mutable: true, max_data_points: 1000 },
+	timeline: { name: tl('timeline.timeline'), mutable: true, max_data_points: 1 },
+}
 
 StateMemory.init('animation_presets', 'array');
 
@@ -1025,7 +1048,7 @@ BARS.defineActions(() => {
 		condition: () => Modes.animate && Timeline.selected_animator && Timeline.selected_animator.applyAnimationPreset,
 		icon: 'library_books',
 		click: function (e) {
-			new Menu('apply_animation_preset', this.children(), {searchable: true}).open(e.target);
+			new Menu('apply_animation_preset', this.children(), { searchable: true }).open(e.target);
 		},
 		children() {
 			let animator = Timeline.selected_animator;
@@ -1050,17 +1073,19 @@ BARS.defineActions(() => {
 						animator.applyAnimationPreset(preset);
 					},
 					children: [
-						{icon: 'delete', name: 'generic.delete', click: () => {
-							Blockbench.showMessageBox({
-								title: 'generic.delete',
-								message: 'generic.confirm_delete',
-								buttons: ['dialog.confirm', 'dialog.cancel'],
-							}, result => {
-								if (result == 1) return;
-								StateMemory.animation_presets.remove(preset);
-								StateMemory.save('animation_presets');
-							})
-						}}
+						{
+							icon: 'delete', name: 'generic.delete', click: () => {
+								Blockbench.showMessageBox({
+									title: 'generic.delete',
+									message: 'generic.confirm_delete',
+									buttons: ['dialog.confirm', 'dialog.cancel'],
+								}, result => {
+									if (result == 1) return;
+									StateMemory.animation_presets.remove(preset);
+									StateMemory.save('animation_presets');
+								})
+							}
+						}
 					]
 				}
 				entries.push(entry);
@@ -1071,17 +1096,17 @@ BARS.defineActions(() => {
 	new Action('save_animation_preset', {
 		icon: 'playlist_add',
 		condition: () => Modes.animate && Keyframe.selected.length && Keyframe.selected.allAre(kf => kf.animator == Keyframe.selected[0].animator),
-		click(event) {	
+		click(event) {
 			let dialog = new Dialog({
 				id: 'save_animation_preset',
 				title: 'action.save_animation_preset',
 				width: 540,
 				form: {
-					name: {label: 'generic.name'},
+					name: { label: 'generic.name' },
 				},
-				onConfirm: function(formResult) {
+				onConfirm: function (formResult) {
 					if (!formResult.name) return;
-	
+
 					let preset = {
 						uuid: guid(),
 						name: formResult.name,

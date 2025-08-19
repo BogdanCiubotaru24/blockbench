@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 	<title>Blockbench</title>
 	<meta charset="utf-8" />
@@ -24,21 +25,22 @@
 	<style type="text/css" id="theme_css"></style>
 	<style type="text/css" id="theme_thumbnail_css"></style>
 </head>
+
 <body spellcheck="false" class="maximized">
 	<script>
-		if (typeof module === 'object') {window.module = module; module = undefined;}//jQuery Fix
+		if (typeof module === 'object') { window.module = module; module = undefined; }//jQuery Fix
 		const isApp = typeof require !== 'undefined';
 
-		
+
 		if (localStorage.getItem('theme')) {
 			try {
 				stored_theme = JSON.parse(localStorage.getItem('theme'));
 				document.body.style.setProperty('--color-dark', stored_theme.colors.dark);
-			} catch (err) {}
+			} catch (err) { }
 		}
 		window.ErrorLog = [];
 		window.onerror = (message, file, line) => {
-			window.ErrorLog.push({message, file, line})
+			window.ErrorLog.push({ message, file, line })
 			if (typeof Blockbench != 'undefined' && Blockbench.setup_successful) return;
 
 			let error_element = document.querySelector('#loading_error_detail');
@@ -50,8 +52,10 @@
 	<div id="loading_error_message" style="display: none;">
 		<div>An error occurred while loading Blockbench</div>
 		<div id="loading_error_detail" style="color: var(--color-subtle_text);"></div>
-		<button onclick="isApp ? Blockbench.reload() : window.location.reload(true)" class="large" style="margin-right: auto; margin-left: auto;">Reload</button>
-		<button onclick="factoryResetAndReload()" class="large" style="margin-right: auto; margin-left: auto;">Factory Reset</button>
+		<button onclick="isApp ? Blockbench.reload() : window.location.reload(true)" class="large"
+			style="margin-right: auto; margin-left: auto;">Reload</button>
+		<button onclick="factoryResetAndReload()" class="large" style="margin-right: auto; margin-left: auto;">Factory
+			Reset</button>
 		<button onclick="window.close()" class="large" style="margin-right: auto; margin-left: auto;">Quit</button>
 	</div>
 	<script>
@@ -64,136 +68,352 @@
 			error_element.innerHTML = `Incompatible browser version. Please update your web browser.`
 		}
 	</script>
-		<script src="lib/vue.min.js"></script>
-		<script src="lib/vue_sortable.js"></script>
-		<script src="lib/jquery.js"></script>
-		<script src="lib/jquery-ui.min.js"></script>
-		<script src="lib/targa.js"></script>
-		<script src="lib/jszip.min.js"></script>
-		<script src="lib/gif.js"></script>
-		<script src="lib/FileSaver.js"></script>
-		<script src="lib/prism.js"></script>
-		<script src="lib/VuePrismEditor.min.js"></script>
-		<script src="lib/molang-prism-syntax.js"></script>
-		<script src="lib/lzutf8.js"></script>
-		<script src="lib/peer.min.js"></script>
-		<script src="lib/marked.min.js"></script>
-		<script src="lib/purify.min.js"></script>
-		<script src="lib/spectrum.js"></script>
-		<script src="lib/color-picker.min.js"></script>
-		<script src="lib/three.min.js"></script>
-		<script src="lib/three_custom.js"></script>
-		<script src="js/animations/ik_constraints.js"></script>
-		<script src="js/animations/ik_patch_template.js"></script>
-		<script src="js/animations/ik_install_hook.js"></script>
-		<script src="lib/GLTFExporter.js"></script>
-		<script src="lib/CanvasFrame.js"></script>
-		<script src="lib/canvas2apng.js"></script>
-		<script src="lib/fik.min.js"></script>
-		<script src="lib/molang.umd.js"></script>
-		<script src="lib/wintersky.umd.js"></script>
-		<script src="lib/easing.js"></script>
-		
-		<script src="bundle.js"></script>
-		<script src="js/preview/OrbitControls.js"></script>
-		<script src="js/util/util.js"></script>
-		<script src="js/util/math_util.js"></script>
-		<script src="js/util/array_util.js"></script>
-		<script src="js/util/event_system.js"></script>
-		<script src="js/util/property.js"></script>
-		<script src="js/util/json.js"></script>
-		<script src="js/interface/menu.js"></script>
-		<script src="js/interface/actions.js"></script>
-		<script src="js/interface/themes.js"></script>
-		<script src="js/interface/shared_actions.js"></script>
-		<script src="js/misc.js"></script>
-		<script src="js/modes.js"></script>
-		<script src="js/api.js"></script>
-		<script src="js/file_system.js"></script>
-		<script src="js/interface/vue_components.js"></script>
-		<script src="js/interface/panels.js"></script>
-		<script src="js/interface/interface.js"></script>
-		<script src="js/interface/menu_bar.js"></script>
-		<script src="js/interface/start_screen.js"></script>
-		<script src="js/interface/form.js"></script>
-		<script src="js/interface/dialog.js"></script>
-		<script src="js/interface/keyboard.js"></script>
-		<script src="js/interface/settings.js"></script>
-		<script src="js/interface/about.js"></script>
-		<script src="js/interface/action_control.js"></script>
-		<script src="js/copy_paste.js"></script>
-		<script src="js/undo.js"></script>
+	<script src="lib/vue.min.js"></script>
+	<script src="lib/vue_sortable.js"></script>
+	<script src="lib/jquery.js"></script>
+	<script src="lib/jquery-ui.min.js"></script>
+	<script src="lib/targa.js"></script>
+	<script src="lib/jszip.min.js"></script>
+	<script src="lib/gif.js"></script>
+	<script src="lib/FileSaver.js"></script>
+	<script src="lib/prism.js"></script>
+	<script src="lib/VuePrismEditor.min.js"></script>
+	<script src="lib/molang-prism-syntax.js"></script>
+	<script src="lib/lzutf8.js"></script>
+	<script src="lib/peer.min.js"></script>
+	<script src="lib/marked.min.js"></script>
+	<script src="lib/purify.min.js"></script>
+	<script src="lib/spectrum.js"></script>
+	<script src="lib/color-picker.min.js"></script>
+	<script src="lib/three.min.js"></script>
+	<script src="lib/three_custom.js"></script>
+	<script src="js/animations/ik_constraints.js"></script>
+	<script src="js/animations/ik_patch_template.js"></script>
+	<script src="js/animations/ik_install_hook.js"></script>
+	<script src="lib/GLTFExporter.js"></script>
+	<script src="lib/CanvasFrame.js"></script>
+	<script src="lib/canvas2apng.js"></script>
+	<script src="lib/fik.min.js"></script>
+	<script src="lib/molang.umd.js"></script>
+	<script src="lib/wintersky.umd.js"></script>
+	<script src="lib/easing.js"></script>
 
-		<script type="text/javascript">
-			if (isApp === true) {
-				document.write("<script src='js/desktop.js'><\/script>");
-			} else {
-				document.write("<script src='js/web.js'><\/script>");
+	<script src="bundle.js"></script>
+	<script src="js/preview/OrbitControls.js"></script>
+	<script src="js/util/util.js"></script>
+	<script src="js/util/math_util.js"></script>
+	<script src="js/util/array_util.js"></script>
+	<script src="js/util/event_system.js"></script>
+	<script src="js/util/property.js"></script>
+	<script src="js/util/json.js"></script>
+	<script src="js/interface/menu.js"></script>
+	<script src="js/interface/actions.js"></script>
+	<script src="js/animations/ik_test_runner.js"></script>
+	<script>
+		/**
+		 * IK CSV Visualizer (file-driven)
+		 * Renders grid (points) and circle (polyline) CSVs produced by ik_test_runner.js
+		 * into the Blockbench preview scene with pass/fail coloring by posErr.
+		 *
+		 * Menu actions:
+		 *  - Animation → IK: Load & Visualize CSV
+		 *  - Animation → IK: Clear CSV Visualization
+		 */
+		(function () {
+			if (!window.THREE) { console.warn('[ik_csv_visualizer] THREE missing'); return; }
+			const hasBB = typeof Blockbench !== 'undefined';
+
+			// ------- helpers -------
+			function greenRedColor01(t) {
+				t = Math.max(0, Math.min(1, t || 0));
+				return { r: t, g: 1 - t, b: 0 };
 			}
-		</script>
+			function readFileAsText(file) {
+				return new Promise((res, rej) => {
+					const fr = new FileReader();
+					fr.onload = () => res(String(fr.result || ''));
+					fr.onerror = rej;
+					fr.readAsText(file);
+				});
+			}
+			function parseCSV(text) {
+				const lines = String(text || '').replace(/\r/g, '').split('\n').filter(Boolean);
+				if (!lines.length) return [];
+				const head = lines.shift().split(',').map(s => s.trim());
+				const rows = [];
+				for (const ln of lines) {
+					const cols = ln.split(',').map(s => s.trim());
+					const r = {};
+					for (let i = 0; i < head.length; i++) {
+						const k = head[i];
+						const v = cols[i];
+						if (k === 'ok') r.ok = (v === '1' || String(v).toLowerCase() === 'true');
+						else r[k] = Number(v);
+					}
+					rows.push(r);
+				}
+				return rows;
+			}
+			function pickCSVs() {
+				return new Promise(resolve => {
+					const input = document.createElement('input');
+					input.type = 'file';
+					input.accept = '.csv,text/csv';
+					input.multiple = true;
+					input.style.display = 'none';
+					document.body.appendChild(input);
+					input.addEventListener('change', () => {
+						const files = Array.from(input.files || []);
+						document.body.removeChild(input);
+						resolve(files);
+					}, { once: true });
+					input.click();
+				});
+			}
 
-		<script src="js/edit_sessions.js"></script>
-		<script src="js/validator.js"></script>
-		<script src="js/outliner/outliner.js"></script>
-		<script src="js/outliner/collections.js"></script>
-		<script src="js/outliner/group.js"></script>
-		<script src="js/outliner/mesh.js"></script>
-		<script src="js/outliner/cube.js"></script>
-		<script src="js/outliner/texture_mesh.js"></script>
-		<script src="js/outliner/locator.js"></script>
-		<script src="js/outliner/null_object.js"></script>
-		<script src="js/preview/preview.js"></script>
-		<script src="js/preview/reference_images.js"></script>
-		<script src="js/preview/screenshot.js"></script>
-		<script src="js/preview/canvas.js"></script>
-		<script src="js/modeling/transform_gizmo.js"></script>
-		<script src="js/modeling/transform.js"></script>
-		<script src="js/modeling/scale.js"></script>
-		<script src="js/modeling/mesh_editing.js"></script>
-		<script src="js/modeling/mirror_modeling.js"></script>
-		<script src="js/texturing/layers.js"></script>
-		<script src="js/texturing/textures.js"></script>
-		<script src="js/texturing/texture_groups.js"></script>
-		<script src="js/texturing/texture_flipbook.js"></script>
-		<script src="js/texturing/uv.js"></script>
-		<script src="js/texturing/painter.js"></script>
-		<script src="js/texturing/texture_generator.js"></script>
-		<script src="js/texturing/color.js"></script>
-		<script src="js/texturing/edit_image.js"></script>
-		<script src="js/display_mode.js"></script>
-		<script src="js/animations/animation_mode.js"></script>
-		<script src="js/animations/animation.js"></script>
-		<script src="js/animations/molang.js"></script>
-		<script src="js/animations/timeline_animators.js"></script>
-		<script src="js/animations/keyframe.js"></script>
-		<script src="js/animations/timeline.js"></script>
-		<script src="js/animations/animation_controllers.js"></script>
-		<script src="js/preview/preview_scenes.js"></script>
-		<script src="js/predicate_editor.js"></script>
-		<script src="js/plugin_loader.js"></script>
+			// ------- scene objects & lifecycle -------
+			let csvPointsOK = null, csvPointsFail = null, csvCircleLine = null;
 
-		<script src="js/io/codec.js"></script>
-		<script src="js/io/format.js"></script>
-		<script src="js/io/project.js"></script>
-		<script src="js/io/io.js"></script>
-		<script src="js/io/share.js"></script>
-		<script src="js/io/formats/generic.js"></script>
-		<script src="js/io/formats/bbmodel.js"></script>
-		<script src="js/io/formats/java_block.js"></script>
-		<script src="js/io/formats/bedrock.js"></script>
-		<script src="js/io/formats/bedrock_old.js"></script>
-		<script src="js/io/formats/obj.js"></script>
-		<script src="js/io/formats/gltf.js"></script>
-		<script src="js/io/formats/fbx.js"></script>
-		<script src="js/io/formats/collada.js"></script>
-		<script src="js/io/formats/modded_entity.js"></script>
-		<script src="js/io/formats/optifine_jem.js"></script>
-		<script src="js/io/formats/optifine_jpm.js"></script>
-		<script src="js/io/formats/skin.js"></script>
-		<script src="js/io/formats/image.js"></script>
-		<script src="js/globals.js"></script>
+			function disposeObj(obj) {
+				try {
+					if (!obj) return;
+					if (obj.geometry) obj.geometry.dispose();
+					if (obj.material) {
+						if (Array.isArray(obj.material)) obj.material.forEach(m => m && m.dispose());
+						else obj.material.dispose();
+					}
+				} catch { }
+			}
+			function clearCSVMeshes() {
+				for (const obj of [csvPointsOK, csvPointsFail, csvCircleLine]) {
+					if (obj && window.scene) scene.remove(obj);
+					disposeObj(obj);
+				}
+				csvPointsOK = csvPointsFail = csvCircleLine = null;
+			}
 
-		<script>if (window.module) module = window.module;</script>
+			// ------- render from CSV -------
+			function renderCSV(gridRows, circleRows, opts = {}) {
+				const pointSize = Number(opts.pointSize ?? 6);       // in world units (PointsMaterial size)
+				const okThreshold = Number(opts.okThreshold ?? 1e-2); // used only if "ok" missing
+				clearCSVMeshes();
+
+				const allErrs = [];
+				if (Array.isArray(gridRows)) allErrs.push(...gridRows.map(r => r.posErr).filter(Number.isFinite));
+				if (Array.isArray(circleRows)) allErrs.push(...circleRows.map(r => r.posErr).filter(Number.isFinite));
+				const maxErr = Math.max(1e-9, allErrs.length ? Math.max(...allErrs) : 1);
+
+				// --- GRID as two point clouds (ok vs fail) ---
+				if (Array.isArray(gridRows) && gridRows.length) {
+					const posOK = [], colOK = [];
+					const posFail = [], colFail = [];
+					let total = 0, pass = 0;
+
+					for (const r of gridRows) {
+						if (![r.x, r.y, r.z, r.posErr].every(Number.isFinite)) continue;
+						const ok = (typeof r.ok === 'boolean') ? r.ok : (r.posErr <= okThreshold);
+						const norm = Math.min(Math.max(r.posErr / maxErr, 0), 1);
+						const c = greenRedColor01(norm);
+						const pArr = [r.x, r.y, r.z];
+						if (ok) { posOK.push(...pArr); colOK.push(c.r, c.g, c.b); pass++; }
+						else { posFail.push(...pArr); colFail.push(c.r, c.g, c.b); }
+						total++;
+					}
+
+					if (posOK.length) {
+						const g = new THREE.BufferGeometry();
+						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posOK), 3));
+						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colOK), 3));
+						const m = new THREE.PointsMaterial({ size: pointSize, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95 });
+						csvPointsOK = new THREE.Points(g, m);
+						scene.add(csvPointsOK);
+					}
+					if (posFail.length) {
+						const g = new THREE.BufferGeometry();
+						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posFail), 3));
+						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colFail), 3));
+						const m = new THREE.PointsMaterial({ size: pointSize, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95 });
+						csvPointsFail = new THREE.Points(g, m);
+						scene.add(csvPointsFail);
+					}
+
+					if (hasBB) Blockbench.showQuickMessage(`Grid: ${pass}/${total} passed (ε=${okThreshold}).`);
+				}
+
+				// --- CIRCLE as colored polyline ---
+				if (Array.isArray(circleRows) && circleRows.length >= 2) {
+					const pos = [], col = [];
+					for (const r of circleRows) {
+						if (![r.x, r.y, r.z, r.posErr].every(Number.isFinite)) continue;
+						const norm = Math.min(Math.max(r.posErr / maxErr, 0), 1);
+						const c = greenRedColor01(norm);
+						pos.push(r.x, r.y, r.z);
+						col.push(c.r, c.g, c.b);
+					}
+					if (pos.length >= 6) {
+						const g = new THREE.BufferGeometry();
+						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pos), 3));
+						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(col), 3));
+						const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
+						csvCircleLine = new THREE.Line(g, m);
+						scene.add(csvCircleLine);
+					}
+				}
+			}
+
+			// ------- action handlers -------
+			async function onLoadAndVisualize() {
+				try {
+					const files = await pickCSVs();
+					if (!files || !files.length) { if (hasBB) Blockbench.showQuickMessage('No CSV selected'); return; }
+					const texts = await Promise.all(files.map(readFileAsText));
+					const datasets = texts.map(parseCSV).filter(arr => arr && arr.length);
+
+					let gridRows = null, circleRows = null;
+					for (const rows of datasets) {
+						const first = rows[0] || {};
+						const isGrid = ('ix' in first) && ('iy' in first);
+						const isCircle = !isGrid && ('i' in first);
+						if (isGrid) gridRows = rows;
+						else if (isCircle) circleRows = rows;
+					}
+					if (!gridRows && !circleRows) {
+						if (hasBB) Blockbench.showQuickMessage('Could not recognize CSV columns. Expected ix,iy,x,y,z,posErr,ok (grid) or i,x,y,z,posErr,ok (circle).');
+						return;
+					}
+					renderCSV(gridRows, circleRows, { pointSize: 6, okThreshold: 1e-2 });
+				} catch (e) {
+					console.error(e);
+					if (hasBB) Blockbench.showQuickMessage('CSV load failed. See console for details.');
+				}
+			}
+			function onClear() {
+				clearCSVMeshes();
+				if (hasBB) Blockbench.showQuickMessage('CSV visualization cleared.');
+			}
+
+			// ------- register actions -------
+			if (typeof BARS !== 'undefined') {
+				BARS.defineActions(() => {
+					new Action('ik_load_csv_visualizer', {
+						icon: 'scatter_plot',
+						name: 'IK: Load & Visualize CSV',
+						condition: () => Modes.animate,
+						click: onLoadAndVisualize
+					});
+					new Action('ik_clear_csv_visualizer', {
+						icon: 'layers_clear',
+						name: 'IK: Clear CSV Visualization',
+						condition: () => Modes.animate,
+						click: onClear
+					});
+				});
+			}
+
+			// Try to attach both actions into the Animation menu if available now;
+			// If menu builds later, the actions are still searchable via Ctrl/Cmd+P.
+			try {
+				if (window.BarItems && BarItems.animation_menu && Array.isArray(BarItems.animation_menu.children)) {
+					BarItems.animation_menu.children.push('_');
+					BarItems.animation_menu.children.push('ik_load_csv_visualizer');
+					BarItems.animation_menu.children.push('ik_clear_csv_visualizer');
+				}
+			} catch { }
+
+			console.log('[ik_csv_visualizer] Ready: use “IK: Load & Visualize CSV” (Animation menu or search).');
+		})();
+	</script>
+
+	<script src="js/interface/themes.js"></script>
+	<script src="js/interface/shared_actions.js"></script>
+	<script src="js/misc.js"></script>
+	<script src="js/modes.js"></script>
+	<script src="js/api.js"></script>
+	<script src="js/file_system.js"></script>
+	<script src="js/interface/vue_components.js"></script>
+	<script src="js/interface/panels.js"></script>
+	<script src="js/interface/interface.js"></script>
+	<script src="js/interface/menu_bar.js"></script>
+	<script src="js/interface/start_screen.js"></script>
+	<script src="js/interface/form.js"></script>
+	<script src="js/interface/dialog.js"></script>
+	<script src="js/interface/keyboard.js"></script>
+	<script src="js/interface/settings.js"></script>
+	<script src="js/interface/about.js"></script>
+	<script src="js/interface/action_control.js"></script>
+	<script src="js/copy_paste.js"></script>
+	<script src="js/undo.js"></script>
+
+	<script type="text/javascript">
+		if (isApp === true) {
+			document.write("<script src='js/desktop.js'><\/script>");
+		} else {
+			document.write("<script src='js/web.js'><\/script>");
+		}
+	</script>
+
+	<script src="js/edit_sessions.js"></script>
+	<script src="js/validator.js"></script>
+	<script src="js/outliner/outliner.js"></script>
+	<script src="js/outliner/collections.js"></script>
+	<script src="js/outliner/group.js"></script>
+	<script src="js/outliner/mesh.js"></script>
+	<script src="js/outliner/cube.js"></script>
+	<script src="js/outliner/texture_mesh.js"></script>
+	<script src="js/outliner/locator.js"></script>
+	<script src="js/outliner/null_object.js"></script>
+	<script src="js/preview/preview.js"></script>
+	<script src="js/preview/reference_images.js"></script>
+	<script src="js/preview/screenshot.js"></script>
+	<script src="js/preview/canvas.js"></script>
+	<script src="js/modeling/transform_gizmo.js"></script>
+	<script src="js/modeling/transform.js"></script>
+	<script src="js/modeling/scale.js"></script>
+	<script src="js/modeling/mesh_editing.js"></script>
+	<script src="js/modeling/mirror_modeling.js"></script>
+	<script src="js/texturing/layers.js"></script>
+	<script src="js/texturing/textures.js"></script>
+	<script src="js/texturing/texture_groups.js"></script>
+	<script src="js/texturing/texture_flipbook.js"></script>
+	<script src="js/texturing/uv.js"></script>
+	<script src="js/texturing/painter.js"></script>
+	<script src="js/texturing/texture_generator.js"></script>
+	<script src="js/texturing/color.js"></script>
+	<script src="js/texturing/edit_image.js"></script>
+	<script src="js/display_mode.js"></script>
+	<script src="js/animations/animation_mode.js"></script>
+	<script src="js/animations/animation.js"></script>
+	<script src="js/animations/molang.js"></script>
+	<script src="js/animations/timeline_animators.js"></script>
+	<script src="js/animations/keyframe.js"></script>
+	<script src="js/animations/timeline.js"></script>
+	<script src="js/animations/animation_controllers.js"></script>
+	<script src="js/preview/preview_scenes.js"></script>
+	<script src="js/predicate_editor.js"></script>
+	<script src="js/plugin_loader.js"></script>
+
+	<script src="js/io/codec.js"></script>
+	<script src="js/io/format.js"></script>
+	<script src="js/io/project.js"></script>
+	<script src="js/io/io.js"></script>
+	<script src="js/io/share.js"></script>
+	<script src="js/io/formats/generic.js"></script>
+	<script src="js/io/formats/bbmodel.js"></script>
+	<script src="js/io/formats/java_block.js"></script>
+	<script src="js/io/formats/bedrock.js"></script>
+	<script src="js/io/formats/bedrock_old.js"></script>
+	<script src="js/io/formats/obj.js"></script>
+	<script src="js/io/formats/gltf.js"></script>
+	<script src="js/io/formats/fbx.js"></script>
+	<script src="js/io/formats/collada.js"></script>
+	<script src="js/io/formats/modded_entity.js"></script>
+	<script src="js/io/formats/optifine_jem.js"></script>
+	<script src="js/io/formats/optifine_jpm.js"></script>
+	<script src="js/io/formats/skin.js"></script>
+	<script src="js/io/formats/image.js"></script>
+	<script src="js/globals.js"></script>
+
+	<script>if (window.module) module = window.module;</script>
 
 	<div style="display: none;"></div>
 
@@ -215,7 +435,8 @@
 			<img class="blockbench_logo" src="assets/logo_text_white.svg" alt="Blockbench" />
 		</div>
 		<ul id="menu_bar" class="scroll_horizontal"></ul>
-		<div id="title_bar_home_button" class="tool" onclick="Interface.tab_bar.openNewTab()"><i class="material-icons icon">home</i></div>
+		<div id="title_bar_home_button" class="tool" onclick="Interface.tab_bar.openNewTab()"><i
+				class="material-icons icon">home</i></div>
 		<div class="app-drag-region" id="header_free_bar"></div>
 		<div id="update_menu"></div>
 		<div id="settings_profiles_header_menu" class="hidden tool">
@@ -223,22 +444,34 @@
 		</div>
 		<ul id="windows_window_menu" hidden>
 			<li onclick="currentwindow.minimize()">
-				<svg width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M14 8v1H3V8h11z"/></svg>
+				<svg width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+					<path d="M14 8v1H3V8h11z" />
+				</svg>
 			</li>
 			<li onclick="currentwindow.isMaximized() ? currentwindow.unmaximize() : currentwindow.maximize()">
-				<svg class="restore" width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M3 5v9h9V5H3zm8 8H4V6h7v7z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M5 5h1V4h7v7h-1v1h2V3H5v2z"/></svg>
-				<svg class="maximize" width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M3 3v10h10V3H3zm9 9H4V4h8v8z"/></svg>
+				<svg class="restore" width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"
+					fill="currentColor">
+					<path d="M3 5v9h9V5H3zm8 8H4V6h7v7z" />
+					<path fill-rule="evenodd" clip-rule="evenodd" d="M5 5h1V4h7v7h-1v1h2V3H5v2z" />
+				</svg>
+				<svg class="maximize" width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"
+					fill="currentColor">
+					<path d="M3 3v10h10V3H3zm9 9H4V4h8v8z" />
+				</svg>
 			</li>
 			<li class="wwm_r" onclick="currentwindow.close()">
-				<svg width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.116 8l-4.558 4.558.884.884L8 8.884l4.558 4.558.884-.884L8.884 8l4.558-4.558-.884-.884L8 7.116 3.442 2.558l-.884.884L7.116 8z"/></svg>
+				<svg width="18" height="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+					<path fill-rule="evenodd" clip-rule="evenodd"
+						d="M7.116 8l-4.558 4.558.884.884L8 8.884l4.558 4.558.884-.884L8.884 8l4.558-4.558-.884-.884L8 7.116 3.442 2.558l-.884.884L7.116 8z" />
+				</svg>
 			</li>
 		</ul>
 		<button id="web_download_button" hidden><a href="https://blockbench.net/downloads">
-			<span class="tl">web.download_app</span>
-			<i class="material-icons icon">system_update</i>
-		</a></button>
+				<span class="tl">web.download_app</span>
+				<i class="material-icons icon">system_update</i>
+			</a></button>
 	</header>
-	
+
 
 	<div id="page_wrapper" class="invisible start_screen">
 
@@ -246,28 +479,22 @@
 
 		<div id="tab_bar" :class="{drag_mode: drag_target_index !== null}">
 			<div id="tab_bar_list" @wheel="mousewheelBar($event)" ref="tab_bar_list">
-				<div
-					class="project_tab"
-					v-for="(project, index) in tabs" :key="project.uuid"
-					:class="{
+				<div class="project_tab" v-for="(project, index) in tabs" :key="project.uuid" :class="{
 						selected: project.selected,
 						new_tab: project.is_new_tab,
 						dragging: index == drag_target_index,
 						move_back:  (drag_position_index !== null && index > drag_target_index && drag_position_index >= index),
 						move_forth: (drag_position_index !== null && index < drag_target_index && drag_position_index <= index)
-					}"
-					:title="project.name || project.geometry_name || ''"
-					@dblclick="project.openSettings()"
-					@contextmenu="project.showContextMenu($event)"
-					@mousedown="mouseDown(project, $event)"
-					@mouseup="mouseUp(project, $event)"
-					@mouseenter="mouseEnter(project, $event)"
-					@mouseleave="mouseLeave(project, $event)"
-				>
+					}" :title="project.name || project.geometry_name || ''" @dblclick="project.openSettings()"
+					@contextmenu="project.showContextMenu($event)" @mousedown="mouseDown(project, $event)"
+					@mouseup="mouseUp(project, $event)" @mouseenter="mouseEnter(project, $event)"
+					@mouseleave="mouseLeave(project, $event)">
 					<dynamic-icon :icon="project.format ? project.format.icon : 'home'"></dynamic-icon>
-					<label class="project_tab_session_badge" v-if="project.EditSession"><i class="material-icons">group</i>{{ project.EditSession.client_count }}</label>
+					<label class="project_tab_session_badge" v-if="project.EditSession"><i
+							class="material-icons">group</i>{{ project.EditSession.client_count }}</label>
 					<label>{{ project.getDisplayName() }}</label>
-					<div class="project_tab_close_button" :class="{unsaved: !project.saved}" :title="close_tab_label" @click="project.close()">
+					<div class="project_tab_close_button" :class="{unsaved: !project.saved}" :title="close_tab_label"
+						@click="project.close()">
 						<i class="material-icons close_icon">clear</i>
 						<i class="material-icons unsaved_icon" v-if="!project.saved">fiber_manual_record</i>
 					</div>
@@ -292,15 +519,11 @@
 
 				<div class="toolbar_wrapper narrow tool_options"></div>
 				<ul id="mode_selector" v-if="showModes()">
-					<li
-						v-for="mode in options"
-						v-if="Condition(mode.condition)"
-						v-bind:class="{selected: mode.selected}"
-						v-on:mousedown="mode.select()"
-					>{{ mode.name }}</li>
+					<li v-for="mode in options" v-if="Condition(mode.condition)"
+						v-bind:class="{selected: mode.selected}" v-on:mousedown="mode.select()">{{ mode.name }}</li>
 				</ul>
 			</div>
-			
+
 			<div id="left_bar" class="sidebar"></div>
 
 			<div id="right_bar" class="sidebar"></div>
@@ -321,9 +544,9 @@
 			<div id="panel_selector_bar"></div>
 
 		</div>
-	
+
 	</div>
-	
+
 	<script src="js/boot_loader.js"></script>
 	<script>
 		if (!Blockbench || !Blockbench.setup_successful) {
@@ -336,4 +559,5 @@
 		}
 	</script>
 </body>
+
 </html>
