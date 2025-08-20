@@ -228,12 +228,21 @@
                                 metrics = Array.isArray(metrics) && metrics.length ? metrics : ['posErr'];
                                 lastMetrics = metrics.slice();
 
-                                for (const metric of metrics) {
-                                        // collect ranges for this metric
-                                        const allVals = [];
-                                        if (Array.isArray(gridRows)) allVals.push(...gridRows.map(r => r[metric]).filter(Number.isFinite));
-                                        if (Array.isArray(circleRows)) allVals.push(...circleRows.map(r => r[metric]).filter(Number.isFinite));
-                                        const maxVal = Math.max(1e-9, allVals.length ? Math.max(...allVals) : 1);
+                               for (const metric of metrics) {
+                                       // Determine green/red threshold
+                                       // For positional and distance metrics we compare against an
+                                       // absolute epsilon so points near 0 stay green even if the
+                                       // dataset contains large outliers.
+                                       let maxVal;
+                                       if (metric === 'posErr' || metric === 'targetDist') {
+                                               maxVal = DEFAULT_OK_EPS;
+                                       } else {
+                                               // Fall back to relative range for any other metric
+                                               const allVals = [];
+                                               if (Array.isArray(gridRows)) allVals.push(...gridRows.map(r => r[metric]).filter(Number.isFinite));
+                                               if (Array.isArray(circleRows)) allVals.push(...circleRows.map(r => r[metric]).filter(Number.isFinite));
+                                               maxVal = Math.max(1e-9, allVals.length ? Math.max(...allVals) : 1);
+                                       }
 
                                         // --- GRID points (ok/fail split) ---
                                         if (Array.isArray(gridRows) && gridRows.length) {
