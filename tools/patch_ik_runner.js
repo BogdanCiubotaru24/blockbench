@@ -54,7 +54,7 @@ function ensureBusyFlag(src) {
 const ASYNC_SWEEP = `
 /* ---------- NEW: CUBE SWEEP (3D, async & UI-friendly) ---------- */
 async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }) {
-  const reach = estimateReach(nullObj);
+  const reach = estimateReach(nullObj); // includes controller offset
   const span = reach * halfSpan;
   const N = Math.max(3, steps|0);
 

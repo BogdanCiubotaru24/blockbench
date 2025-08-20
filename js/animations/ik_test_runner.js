@@ -31,7 +31,8 @@
   }
 
   function estimateReach(nullObj) {
-    // Sum distances between each bone start and end in the chain once
+    // Estimate IK chain reach by adding each bone's rest length once and the
+    // distance from the final bone end to the controller.
     let approxReach = 0.0;
     try {
       const target = [...Group.all, ...Locator.all].find(n => n.uuid == nullObj.ik_target);
@@ -42,12 +43,22 @@
       while (current && current !== source) { if (current instanceof Group) bones.push(current); current = current.parent; }
       if (nullObj.ik_source && source instanceof Group) bones.push(source);
       bones.reverse();
+
+      // Sum rest-space distances from each bone origin to the end of the same bone
       for (let i = 0; i < bones.length; i++) {
-        const A = bones[i].mesh.getWorldPosition(new THREE.Vector3());
-        const B = (bones[i+1] ? bones[i+1].mesh.getWorldPosition(new THREE.Vector3())
-                              : new THREE.Vector3().copy(nullObj.getWorldCenter(false)));
-        approxReach += A.distanceTo(B);
+        const start = new THREE.Vector3().fromArray(bones[i].origin || [0,0,0]);
+        const end = new THREE.Vector3().fromArray(
+          (bones[i+1] ? bones[i+1].origin : (target.origin || [0,0,0]))
+        );
+        approxReach += start.distanceTo(end);
       }
+
+      // Include final distance from last bone end (target) to the controller once
+      const targetPos = (typeof target.getWorldCenter === 'function')
+        ? target.getWorldCenter(true)
+        : target.mesh.getWorldPosition(new THREE.Vector3());
+      approxReach += targetPos.distanceTo(nullObj.getWorldCenter(false));
+
     } catch {}
     return approxReach || 1;
   }
@@ -76,6 +87,7 @@
 
   // ---------- GRID SWEEP (2D, existing) ----------
   function runGridSweep({ anim, nullObj, center, halfSpan = 0.6, steps = 21, okEps = 1e-2 }) {
+    // reach includes last bone end ➞ controller distance
     const reach = estimateReach(nullObj);
     const span = reach * halfSpan;
     const N = Math.max(3, steps|0);
@@ -139,6 +151,7 @@
 
   // ---------- NEW: CUBE SWEEP (3D, async & UI-friendly) ----------
 async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }) {
+  // reach includes last bone end ➞ controller distance
   const reach = estimateReach(nullObj);
   const span = reach * halfSpan;
   let N = Math.max(3, steps|0);
