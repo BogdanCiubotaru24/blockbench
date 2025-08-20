@@ -172,14 +172,29 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         const m = (res && res.__metrics) || { posErr: Number.POSITIVE_INFINITY };
         const posErr = m.posErr;
         const nullPos = nullObj.mesh.getWorldPosition(new THREE.Vector3());
-        const tgtPos = targetNode?.mesh.getWorldPosition(new THREE.Vector3());
-        const dist = tgtPos ? nullPos.distanceTo(tgtPos) : Number.POSITIVE_INFINITY;
+        let effPos = null;
+        if (targetNode) {
+          if (typeof targetNode.getWorldCenter === 'function') {
+            effPos = targetNode.getWorldCenter(true);
+          } else {
+            const child = targetNode.children?.find(ch => ch.mesh);
+            if (child && child.mesh) {
+              effPos = child.mesh.getWorldPosition(new THREE.Vector3());
+            } else if (targetNode.mesh) {
+              const start = targetNode.mesh.getWorldPosition(new THREE.Vector3());
+              const dir = new THREE.Vector3(0, -1, 0)
+                .applyQuaternion(targetNode.mesh.getWorldQuaternion(new THREE.Quaternion()));
+              effPos = start.clone().add(dir);
+            }
+          }
+        }
+        const targetDist = effPos ? nullPos.distanceTo(effPos) : Number.POSITIVE_INFINITY;
 
         const ok = (posErr <= okEps);
 
         rows.push([ix,iy,iz,
           p.x.toFixed(6), p.y.toFixed(6), p.z.toFixed(6),
-          posErr.toFixed(6), dist.toFixed(6), ok ? 1 : 0
+          posErr.toFixed(6), targetDist.toFixed(6), ok ? 1 : 0
         ].join(','));
 
         if (ok) pass++; else fail++;
