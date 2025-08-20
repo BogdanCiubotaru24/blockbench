@@ -262,22 +262,30 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         span:   { label: 'Half-span (% of reach)', type: 'number', value: 60, min: 10, max: 120, step: 5 },
         eps:    { label: 'OK threshold (ε)', type: 'number', value: 0.01, step: 0.001 }
       },
-      onConfirm(form) {
+      async onConfirm(form) {
         const steps = Math.max(5, Math.min(41, parseInt(form.steps)));      // 11 → 1331 samples (fast); 21 → 9261 (heavier)
         const halfSpan = Math.max(0.1, Math.min(1.2, (parseFloat(form.span)||60) / 100));
         const okEps = Math.max(1e-6, parseFloat(form.eps)||1e-2);
 
+        // Precompute sample count so progress text works before sweep resolves
+        const N = Math.max(3, steps|0);
+        const totalSamples = N * N * N;
+
         // simple progress nudges (UI stays responsive)
         let lastPct = -1;
-        const { csv, pass, fail, reach, N, total } = runCubeSweep({
+        const result = await runCubeSweepAsync({
           anim, nullObj, center, halfSpan, steps, okEps,
           onProgress: (pct) => {
             const p = Math.floor(pct*100);
-            if (p !== lastPct) { Blockbench.setStatusBarText(`Cube sweep: ${p}% (${total} pts)`); lastPct = p; }
+            if (p !== lastPct) {
+              Blockbench.setStatusBarText(`Cube sweep: ${p}% (${totalSamples} pts)`);
+              lastPct = p;
+            }
           }
         });
         Blockbench.setStatusBarText('');
 
+        const { csv, pass, fail, reach, total } = result;
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         saveCSV(`ik_cube_${stamp}_N${N}_reach${reach.toFixed(3)}.csv`, csv);
         Blockbench.showMessageBox({
