@@ -138,15 +138,14 @@
   }
 
   // ---------- NEW: CUBE SWEEP (3D, async & UI-friendly) ----------
-async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress, metric = 'err' }) {
+async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }) {
   const reach = estimateReach(nullObj);
   const span = reach * halfSpan;
   const N = Math.max(3, steps|0);
 
   const axis = [...Array(N)].map((_,i)=> -span + (2*span)*(i/(N-1)));
   const rows = [];
-  const metricLabel = metric === 'dist' ? 'targetDist' : 'posErr';
-  rows.push(['ix','iy','iz','x','y','z',metricLabel,'ok'].join(','));
+  rows.push(['ix','iy','iz','x','y','z','posErr','targetDist','ok'].join(','));
 
   let pass = 0, fail = 0;
   const origPos = nullObj.mesh.getWorldPosition(new THREE.Vector3());
@@ -154,9 +153,7 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
   let done = 0;
 
   // cache target for distance metric
-  const targetNode = metric === 'dist'
-    ? ([...Group.all, ...Locator.all].find(n => n.uuid == nullObj.ik_target) || null)
-    : null;
+  const targetNode = [...Group.all, ...Locator.all].find(n => n.uuid == nullObj.ik_target) || null;
 
   // small helper to keep UI responsive
   const yieldUI = () => new Promise(requestAnimationFrame);
@@ -171,22 +168,17 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         if ((done & 63) === 0) await yieldUI();
 
         const res = anim.displayIK(true);
+        const m = (res && res.__metrics) || { posErr: Number.POSITIVE_INFINITY };
+        const posErr = m.posErr;
+        const nullPos = nullObj.mesh.getWorldPosition(new THREE.Vector3());
+        const tgtPos = targetNode?.mesh.getWorldPosition(new THREE.Vector3());
+        const dist = tgtPos ? nullPos.distanceTo(tgtPos) : Number.POSITIVE_INFINITY;
 
-        let metricVal;
-        if (metric === 'dist') {
-          const nullPos = nullObj.mesh.getWorldPosition(new THREE.Vector3());
-          const tgtPos = targetNode?.mesh.getWorldPosition(new THREE.Vector3());
-          metricVal = tgtPos ? nullPos.distanceTo(tgtPos) : Number.POSITIVE_INFINITY;
-        } else {
-          const m = (res && res.__metrics) || { posErr: Number.POSITIVE_INFINITY };
-          metricVal = m.posErr;
-        }
-
-        const ok = (metricVal <= okEps);
+        const ok = (posErr <= okEps);
 
         rows.push([ix,iy,iz,
           p.x.toFixed(6), p.y.toFixed(6), p.z.toFixed(6),
-          metricVal.toFixed(6), ok ? 1 : 0
+          posErr.toFixed(6), dist.toFixed(6), ok ? 1 : 0
         ].join(','));
 
         if (ok) pass++; else fail++;
@@ -276,14 +268,12 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
       form: {
         steps:  { label: 'Samples per axis (N)', type: 'number', value: 11, min: 5,  max: 41,  step: 2 },
         span:   { label: 'Half-span (% of reach)', type: 'number', value: 60, min: 10, max: 120, step: 5 },
-        eps:    { label: 'OK threshold (ε)', type: 'number', value: 0.01, step: 0.001 },
-        metric: { label: 'Metric', type: 'select', options: { err: 'Positional error', dist: 'Distance to target' }, value: 'err' }
+        eps:    { label: 'OK threshold (ε)', type: 'number', value: 0.01, step: 0.001 }
       },
       async onConfirm(form) {
         const steps = Math.max(5, Math.min(41, parseInt(form.steps)));      // 11 → 1331 samples (fast); 21 → 9261 (heavier)
         const halfSpan = Math.max(0.1, Math.min(1.2, (parseFloat(form.span)||60) / 100));
         const okEps = Math.max(1e-6, parseFloat(form.eps)||1e-2);
-        const metric = form.metric || 'err';
 
         // Precompute sample count so progress text works before sweep resolves
         const N = Math.max(3, steps|0);
@@ -292,7 +282,7 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         // simple progress nudges (UI stays responsive)
         let lastPct = -1;
         const result = await runCubeSweepAsync({
-          anim, nullObj, center, halfSpan, steps, okEps, metric,
+          anim, nullObj, center, halfSpan, steps, okEps,
           onProgress: (pct) => {
             const p = Math.floor(pct*100);
             if (p !== lastPct) {
@@ -303,9 +293,10 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         });
         Blockbench.setStatusBarText('');
 
-        const { csv, pass, fail, reach, total } = result;
+        const { csv, pass, fail, reach, total, N: resultN } = result;
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-        saveCSV(`ik_cube_${stamp}_N${N}_${metric}_reach${reach.toFixed(3)}.csv`, csv);
+        const fileN = resultN || N;
+        saveCSV(`ik_cube_${stamp}_N${fileN}_reach${reach.toFixed(3)}.csv`, csv);
         Blockbench.showMessageBox({
           title: 'IK Cube Sweep',
           message: `Pass: ${pass}  •  Fail: ${fail}\nReach≈ ${reach.toFixed(3)}  •  Samples: ${N}×${N}×${N} = ${total}`,
