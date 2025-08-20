@@ -642,10 +642,15 @@ class NullObjectAnimator extends BoneAnimator {
 		if (!null_object || !target) return;
 		if (target instanceof Group && !target.ik_enabled) return;
 
-		let bones = [];
-		let ik_target = new THREE.Vector3().copy(null_object.getWorldCenter(true));
-		let bone_references = [];
-		let current = target.parent;
+               let bones = [];
+               let ik_target = new THREE.Vector3().copy(null_object.getWorldCenter(true));
+               let bone_references = [];
+               let current = target.parent;
+
+               // Ensure the target remembers its bind/rest orientation
+               if (target instanceof Group && !target.rest_quaternion) {
+                       target.rest_quaternion = target.mesh.quaternion.clone();
+               }
 
 		let source;
 		if (null_object.ik_source) {
@@ -670,11 +675,14 @@ class NullObjectAnimator extends BoneAnimator {
 		if (!bones.length) return;
 		bones.reverse();
 
-		let base_rotations = {};
-		bones.forEach(bone => {
-			if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
-			base_rotations[bone.uuid] = bone.mesh.rotation.clone();
-		});
+               let base_rotations = {};
+               bones.forEach(bone => {
+                       if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
+                       base_rotations[bone.uuid] = bone.mesh.rotation.clone();
+                       if (!bone.rest_quaternion) {
+                               bone.rest_quaternion = bone.mesh.quaternion.clone();
+                       }
+               });
 
 		bones.forEach((bone, i) => {
 			let startPoint = new FIK.V3(0, 0, 0).copy(bone.mesh.getWorldPosition(new THREE.Vector3()));
@@ -736,10 +744,11 @@ class NullObjectAnimator extends BoneAnimator {
                        let q_new = q_new_unclamped;
                        if (limitsEnabled) {
                                const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
-                               const axisLocal =
+                               const axisLocal = (
                                        keep === 0 ? new THREE.Vector3(1, 0, 0) :
                                                keep === 1 ? new THREE.Vector3(0, 1, 0) :
-                                                       new THREE.Vector3(0, 0, 1);
+                                                       new THREE.Vector3(0, 0, 1)
+                               ).applyQuaternion(bone_ref.bone.rest_quaternion);
                                const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180, -180, -180];
                                const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180, 180, 180];
                                if (bone_ref.bone.rotation_hinge_lock) {
@@ -781,10 +790,11 @@ class NullObjectAnimator extends BoneAnimator {
                        target.mesh.quaternion.premultiply(q1.invert()).normalize();
                        if (window.IKConstraints && target.rotation_limit_enabled) {
                                const keep = Math.min(2, Math.max(0, Math.floor(target.rotation_hinge_axis || 0)));
-                               const axisLocal =
+                               const axisLocal = (
                                        keep === 0 ? new THREE.Vector3(1, 0, 0) :
                                                keep === 1 ? new THREE.Vector3(0, 1, 0) :
-                                                       new THREE.Vector3(0, 0, 1);
+                                                       new THREE.Vector3(0, 0, 1)
+                               ).applyQuaternion(target.rest_quaternion);
                                const minArr = Array.isArray(target.rotation_limit_min) ? target.rotation_limit_min : [-180, -180, -180];
                                const maxArr = Array.isArray(target.rotation_limit_max) ? target.rotation_limit_max : [180, 180, 180];
                                if (target.rotation_hinge_lock) {
