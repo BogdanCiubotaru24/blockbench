@@ -141,9 +141,10 @@
 async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }) {
   const reach = estimateReach(nullObj);
   const span = reach * halfSpan;
-  const N = Math.max(3, steps|0);
-
-  const axis = [...Array(N)].map((_,i)=> -span + (2*span)*(i/(N-1)));
+  let N = Math.max(3, steps|0);
+  if (N % 2 === 0) N++;
+  const step = (2*span)/(N-1);
+  const axis = [...Array(N)].map((_,i)=> (i - (N-1)/2)*step);
   const rows = [];
   rows.push(['ix','iy','iz','x','y','z','posErr','targetDist','ok'].join(','));
 
@@ -276,7 +277,8 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         const okEps = Math.max(1e-6, parseFloat(form.eps)||1e-2);
 
         // Precompute sample count so progress text works before sweep resolves
-        const N = Math.max(3, steps|0);
+        let N = Math.max(3, steps|0);
+        if (N % 2 === 0) N++;
         const totalSamples = N * N * N;
 
         // simple progress nudges (UI stays responsive)
@@ -295,11 +297,11 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
 
         const { csv, pass, fail, reach, total, N: resultN } = result;
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileN = resultN || N;
-        saveCSV(`ik_cube_${stamp}_N${fileN}_reach${reach.toFixed(3)}.csv`, csv);
+        const finalN = resultN || N;
+        saveCSV(`ik_cube_${stamp}_N${finalN}_reach${reach.toFixed(3)}.csv`, csv);
         Blockbench.showMessageBox({
           title: 'IK Cube Sweep',
-          message: `Pass: ${pass}  •  Fail: ${fail}\nReach≈ ${reach.toFixed(3)}  •  Samples: ${N}×${N}×${N} = ${total}`,
+          message: `Pass: ${pass}  •  Fail: ${fail}\nReach≈ ${reach.toFixed(3)}  •  Samples: ${finalN}×${finalN}×${finalN} = ${total}`,
           buttons: ['OK']
         });
       }
