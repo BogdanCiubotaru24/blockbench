@@ -5,7 +5,7 @@
  *   allowing out-of-plane motion.
  */
 const THREE = require('three');
-const { clampHinge } = require('../math/ik_constraints');
+const { clampHinge, clampBall } = require('../math/ik_constraints');
 
 function wrapAngleIntoLimits(angle, min, max) {
   // Bring 'angle' to an equivalent value (angle + 2πk) that lies inside [min, max] if possible.
@@ -23,10 +23,39 @@ function wrapAngleIntoLimits(angle, min, max) {
 class TwoBoneChain {
   constructor(L1, L2, opts = {}) {
     this.L1 = L1; this.L2 = L2;
-    this.axis0 = (opts.axis0 || new THREE.Vector3(0,0,1)).clone().normalize();
-    this.axis1 = (opts.axis1 || new THREE.Vector3(0,0,1)).clone().normalize();
-    this.lim0 = opts.lim0 || { min: -Math.PI*0.75, max: Math.PI*0.75 }; // shoulder range
-    this.lim1 = opts.lim1 || { min: 0.0, max: Math.PI*0.95 };           // elbow flexion
+
+    function buildConstraint(opt, defAxis, defLim) {
+      if (!opt) opt = {};
+      const type = opt.type || 'hinge';
+      const axis = (opt.axis || defAxis).clone().normalize();
+      if (type === 'ball') {
+        return {
+          type,
+          axis,
+          swingX: opt.swingX || Math.PI,
+          swingY: opt.swingY || Math.PI,
+          twistMin: opt.twistMin != null ? opt.twistMin : -Math.PI,
+          twistMax: opt.twistMax != null ? opt.twistMax : Math.PI
+        };
+      } else {
+        const lim = opt.lim || defLim;
+        return { type, axis, min: lim.min, max: lim.max };
+      }
+    }
+
+    this.joint0 = buildConstraint(opts.joint0 || { axis: opts.axis0, lim: opts.lim0, type: opts.type0 }, new THREE.Vector3(0,0,1), { min: -Math.PI*0.75, max: Math.PI*0.75 });
+    this.joint1 = buildConstraint(opts.joint1 || { axis: opts.axis1, lim: opts.lim1, type: opts.type1 }, new THREE.Vector3(0,0,1), { min: 0.0, max: Math.PI*0.95 });
+
+    this.axis0 = this.joint0.axis.clone();
+    this.axis1 = this.joint1.axis.clone();
+
+    // For warm start we use twist ranges as lim0/lim1 for ball joints
+    this.lim0 = this.joint0.type === 'ball'
+      ? { min: this.joint0.twistMin, max: this.joint0.twistMax }
+      : { min: this.joint0.min, max: this.joint0.max };
+    this.lim1 = this.joint1.type === 'ball'
+      ? { min: this.joint1.twistMin, max: this.joint1.twistMax }
+      : { min: this.joint1.min, max: this.joint1.max };
 
     this.q0 = new THREE.Quaternion(); // local joint rotations
     this.q1 = new THREE.Quaternion();
@@ -90,56 +119,86 @@ class TwoBoneChain {
     this.q1.setFromAxisAngle(this.axis1, phi);
 
     // Final strict clamp (no-op if already inside)
-    this.q0 = clampHinge(this.q0, this.axis0, this.lim0.min, this.lim0.max);
-    this.q1 = clampHinge(this.q1, this.axis1, this.lim1.min, this.lim1.max);
+    if (this.joint0.type === 'ball') {
+      this.q0 = clampBall(this.q0, this.axis0, this.joint0.swingX, this.joint0.swingY, this.joint0.twistMin, this.joint0.twistMax);
+    } else {
+      this.q0 = clampHinge(this.q0, this.axis0, this.lim0.min, this.lim0.max);
+    }
+    if (this.joint1.type === 'ball') {
+      this.q1 = clampBall(this.q1, this.axis1, this.joint1.swingX, this.joint1.swingY, this.joint1.twistMin, this.joint1.twistMax);
+    } else {
+      this.q1 = clampHinge(this.q1, this.axis1, this.lim1.min, this.lim1.max);
+    }
   }
 
-  // Rotate a joint strictly about its hinge axis to align the chain toward target
-  rotateJointAboutHinge(jIndex, target) {
+  // Rotate a joint to align the chain toward target, obeying hinge or ball constraints
+  rotateJoint(jIndex, target) {
     const { p0, p1, p2, q0w, a0w, a1w } = this.fk();
+    const joint = jIndex === 1 ? this.joint1 : this.joint0;
 
-    const parent_qw = (jIndex === 1) ? q0w : new THREE.Quaternion();
-    const jointPos  = (jIndex === 1) ? p1 : p0;
-    const axis_w    = (jIndex === 1) ? a1w.clone() : a0w.clone();
+    const parent_qw = jIndex === 1 ? q0w : new THREE.Quaternion();
+    const jointPos  = jIndex === 1 ? p1 : p0;
 
-    // Current and target vectors from the joint, projected onto hinge plane
     const v_cur = p2.clone().sub(jointPos);
     const v_tar = target.clone().sub(jointPos);
 
-    const v_cur_proj = v_cur.clone().sub(axis_w.clone().multiplyScalar(axis_w.dot(v_cur)));
-    const v_tar_proj = v_tar.clone().sub(axis_w.clone().multiplyScalar(axis_w.dot(v_tar)));
+    const n_cur = v_cur.length();
+    const n_tar = v_tar.length();
+    if (n_cur < 1e-9 || n_tar < 1e-9) return;
 
-    const n_cur = v_cur_proj.length();
-    const n_tar = v_tar_proj.length();
-    if (n_cur < 1e-9 || n_tar < 1e-9) return; // degenerate
+    let delta_world;
+    if (joint.type === 'hinge') {
+      const axis_w = jIndex === 1 ? a1w.clone() : a0w.clone();
+      const v_cur_proj = v_cur.clone().sub(axis_w.clone().multiplyScalar(axis_w.dot(v_cur)));
+      const v_tar_proj = v_tar.clone().sub(axis_w.clone().multiplyScalar(axis_w.dot(v_tar)));
 
-    // Signed angle around hinge axis
-    const a = v_cur_proj.clone().multiplyScalar(1 / n_cur);
-    const b = v_tar_proj.clone().multiplyScalar(1 / n_tar);
-    const sin = axis_w.dot(a.clone().cross(b));
-    const cos = THREE.MathUtils.clamp(a.dot(b), -1, 1);
-    let ang = Math.atan2(sin, cos);
+      const ncp = v_cur_proj.length();
+      const ntp = v_tar_proj.length();
+      if (ncp < 1e-9 || ntp < 1e-9) return;
 
-    // Damp and clamp step size
-    ang = THREE.MathUtils.clamp(ang * this.gain, -this.maxStepRad, this.maxStepRad);
+      const a = v_cur_proj.clone().multiplyScalar(1 / ncp);
+      const b = v_tar_proj.clone().multiplyScalar(1 / ntp);
+      const sin = axis_w.dot(a.clone().cross(b));
+      const cos = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+      let ang = Math.atan2(sin, cos);
+      ang = THREE.MathUtils.clamp(ang * this.gain, -this.maxStepRad, this.maxStepRad);
+      delta_world = new THREE.Quaternion().setFromAxisAngle(axis_w, ang);
+    } else { // ball
+      const a = v_cur.clone().multiplyScalar(1 / n_cur);
+      const b = v_tar.clone().multiplyScalar(1 / n_tar);
+      let axis_w = a.clone().cross(b);
+      const s = axis_w.length();
+      if (s < 1e-9) return;
+      axis_w.multiplyScalar(1 / s);
+      const cos = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+      let ang = Math.atan2(s, cos);
+      ang = THREE.MathUtils.clamp(ang * this.gain, -this.maxStepRad, this.maxStepRad);
+      delta_world = new THREE.Quaternion().setFromAxisAngle(axis_w, ang);
+    }
 
-    // Apply world-space delta around hinge axis, convert to joint-local
-    const delta_world = new THREE.Quaternion().setFromAxisAngle(axis_w, ang);
     const delta_local = parent_qw.clone().invert().multiply(delta_world).multiply(parent_qw);
 
     if (jIndex === 1) {
       this.q1 = delta_local.multiply(this.q1).normalize();
-      this.q1 = clampHinge(this.q1, this.axis1, this.lim1.min, this.lim1.max);
+      if (this.joint1.type === 'ball') {
+        this.q1 = clampBall(this.q1, this.axis1, this.joint1.swingX, this.joint1.swingY, this.joint1.twistMin, this.joint1.twistMax);
+      } else {
+        this.q1 = clampHinge(this.q1, this.axis1, this.lim1.min, this.lim1.max);
+      }
     } else {
       this.q0 = delta_local.multiply(this.q0).normalize();
-      this.q0 = clampHinge(this.q0, this.axis0, this.lim0.min, this.lim0.max);
+      if (this.joint0.type === 'ball') {
+        this.q0 = clampBall(this.q0, this.axis0, this.joint0.swingX, this.joint0.swingY, this.joint0.twistMin, this.joint0.twistMax);
+      } else {
+        this.q0 = clampHinge(this.q0, this.axis0, this.lim0.min, this.lim0.max);
+      }
     }
   }
 
   iterate(target) {
     // End → root
-    this.rotateJointAboutHinge(1, target); // elbow
-    this.rotateJointAboutHinge(0, target); // shoulder
+    this.rotateJoint(1, target); // elbow
+    this.rotateJoint(0, target); // shoulder
   }
 
   solve(target, { maxIters = 120, tol = 1e-2 } = {}) {
