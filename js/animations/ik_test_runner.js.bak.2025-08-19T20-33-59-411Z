@@ -1,5 +1,8 @@
 // js/animations/ik_test_runner.js
 (function () {
+  // async cube sweep guard
+  let __cubeSweepBusy = false;
+
   if (!window.THREE) return console.warn('[ik_test_runner] THREE missing');
 
   // ---------- common helpers ----------
@@ -137,7 +140,10 @@
     return { csv: rows.join('\n'), pass, fail };
   }
 
-  // ---------- NEW: CUBE SWEEP (3D, async & UI-friendly) ----------
+  // ---------- NEW: CUBE SWEEP (3D) ----------
+  function runCubeSweep({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }
+
+/* ---------- NEW: CUBE SWEEP (3D, async & UI-friendly) ---------- */
 async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }) {
   const reach = estimateReach(nullObj);
   const span = reach * halfSpan;
@@ -152,7 +158,6 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
   const total = N * N * N;
   let done = 0;
 
-  // small helper to keep UI responsive
   const yieldUI = () => new Promise(requestAnimationFrame);
 
   for (let iz = 0; iz < N; iz++) {
@@ -161,7 +166,6 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         const p = new THREE.Vector3(center.x + axis[ix], center.y + axis[iy], center.z + axis[iz]);
         setNullWorldPosition(nullObj, p);
 
-        // yield every ~64 samples so dialog/buttons/status can update
         if ((done & 63) === 0) await yieldUI();
 
         const res = anim.displayIK(true);
@@ -180,12 +184,48 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
     }
   }
 
-  // restore pose
   setNullWorldPosition(nullObj, origPos);
   anim.displayIK(false);
 
   return { csv: rows.join('\n'), pass, fail, reach, N, total };
 }
+) {
+    const reach = estimateReach(nullObj);
+    const span = reach * halfSpan;
+    const N = Math.max(3, steps|0);
+
+    const axis = [...Array(N)].map((_,i)=> -span + (2*span)*(i/(N-1)));
+    const rows = [];
+    rows.push(['ix','iy','iz','x','y','z','posErr','ok'].join(','));
+
+    let pass = 0, fail = 0;
+    const origPos = nullObj.mesh.getWorldPosition(new THREE.Vector3());
+    const total = N*N*N;
+    let done = 0;
+
+    for (let iz = 0; iz < N; iz++) {
+      for (let iy = 0; iy < N; iy++) {
+        for (let ix = 0; ix < N; ix++) {
+          const p = new THREE.Vector3(center.x + axis[ix], center.y + axis[iy], center.z + axis[iz]);
+          setNullWorldPosition(nullObj, p);
+
+          const res = anim.displayIK(true);
+          const m = (res && res.__metrics) || { posErr: Number.POSITIVE_INFINITY };
+          const ok = (m.posErr <= okEps);
+
+          rows.push([ix,iy,iz,p.x.toFixed(6),p.y.toFixed(6),p.z.toFixed(6), m.posErr.toFixed(6), ok?1:0].join(','));
+          if (ok) pass++; else fail++;
+          done++;
+          if (onProgress && (done % Math.max(1, Math.floor(total/20)) === 0)) onProgress(done/total);
+        }
+      }
+    }
+
+    setNullWorldPosition(nullObj, origPos);
+    anim.displayIK(false);
+
+    return { csv: rows.join('\n'), pass, fail, reach, N, total };
+  }
 
   // ---------- UI actions ----------
   function runGridAction() {
@@ -249,45 +289,65 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
   }
 
   function runCubeAction() {
-    const ctx = findSelectedNullAndAnimator(); if (!ctx) return;
-    const { nullObj, anim } = ctx;
-    const center = nullObj.mesh.getWorldPosition(new THREE.Vector3());
+  const ctx = findSelectedNullAndAnimator(); if (!ctx) return;
+  const { nullObj, anim } = ctx;
+  const center = nullObj.mesh.getWorldPosition(new THREE.Vector3());
 
-    new Dialog({
-      id: 'ik_cube_sweep',
-      title: 'IK Cube Sweep (3D)',
-      width: 380,
-      form: {
-        steps:  { label: 'Samples per axis (N)', type: 'number', value: 11, min: 5,  max: 41,  step: 2 },
-        span:   { label: 'Half-span (% of reach)', type: 'number', value: 60, min: 10, max: 120, step: 5 },
-        eps:    { label: 'OK threshold (ε)', type: 'number', value: 0.01, step: 0.001 }
-      },
-      onConfirm(form) {
-        const steps = Math.max(5, Math.min(41, parseInt(form.steps)));      // 11 → 1331 samples (fast); 21 → 9261 (heavier)
-        const halfSpan = Math.max(0.1, Math.min(1.2, (parseFloat(form.span)||60) / 100));
-        const okEps = Math.max(1e-6, parseFloat(form.eps)||1e-2);
+  let dlg;
+  dlg = new Dialog({
+    id: 'ik_cube_sweep',
+    title: 'IK Cube Sweep (3D)',
+    width: 380,
+    form: {
+      steps:  { label: 'Samples per axis (N)', type: 'number', value: 11, min: 5,  max: 41,  step: 2 },
+      span:   { label: 'Half-span (% of reach)', type: 'number', value: 60, min: 10, max: 120, step: 5 },
+      eps:    { label: 'OK threshold (ε)', type: 'number', value: 0.01, step: 0.001 }
+    },
+    async onConfirm(form) {
+      try {
+        if (dlg && typeof dlg.hide === 'function') dlg.hide();
 
-        // simple progress nudges (UI stays responsive)
+        if (__cubeSweepBusy) {
+          Blockbench.showQuickMessage('Cube sweep already running…');
+          return;
+        }
+        __cubeSweepBusy = true;
+
+        const steps   = Math.max(5, Math.min(41, parseInt(form.steps)));
+        const halfSpan= Math.max(0.1, Math.min(1.2, (parseFloat(form.span)||60)/100));
+        const okEps   = Math.max(1e-6, parseFloat(form.eps)||1e-2);
+
         let lastPct = -1;
-        const { csv, pass, fail, reach, N, total } = runCubeSweep({
+        const { csv, pass, fail, reach, N, total } = await runCubeSweepAsync({
           anim, nullObj, center, halfSpan, steps, okEps,
           onProgress: (pct) => {
-            const p = Math.floor(pct*100);
-            if (p !== lastPct) { Blockbench.setStatusBarText(`Cube sweep: ${p}% (${total} pts)`); lastPct = p; }
+            const p = Math.floor(pct * 100);
+            if (p !== lastPct) { Blockbench.setStatusBarText(`Cube sweep: ${p}% of ${total} pts`); lastPct = p; }
           }
         });
         Blockbench.setStatusBarText('');
 
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-        saveCSV(`ik_cube_${stamp}_N${N}_reach${reach.toFixed(3)}.csv`, csv);
+        const file  = `ik_cube_${stamp}_N${N}_reach${reach.toFixed(3)}.csv`;
+        saveCSV(file, csv);
+
         Blockbench.showMessageBox({
           title: 'IK Cube Sweep',
-          message: `Pass: ${pass}  •  Fail: ${fail}\nReach≈ ${reach.toFixed(3)}  •  Samples: ${N}×${N}×${N} = ${total}`,
+          message: `Pass: ${pass}  •  Fail: ${fail}\nReach≈ ${reach.toFixed(3)}  •  Samples: ${N}×${N}×${N} = ${total}\nSaved: ${file}`,
           buttons: ['OK']
         });
+      } catch (err) {
+        console.error(err);
+        Blockbench.setStatusBarText('');
+        Blockbench.showMessageBox({ title: 'IK Cube Sweep', message: 'Failed. See console for details.', buttons: ['OK'] });
+      } finally {
+        __cubeSweepBusy = false;
       }
-    }).show();
-  }
+    }
+  });
+  dlg.show();
+}
+
 
   // ---------- register actions & add to menus ----------
   BARS.defineActions(() => {

@@ -111,68 +111,66 @@
 	<script src="js/animations/ik_test_runner.js"></script>
 	<script>
 		/**
-		 * IK CSV Visualizer (file-driven)
-		 * Renders grid (points) and circle (polyline) CSVs produced by ik_test_runner.js
-		 * into the Blockbench preview scene with pass/fail coloring by posErr.
-		 *
-		 * Menu actions:
-		 *  - Animation → IK: Load & Visualize CSV
-		 *  - Animation → IK: Clear CSV Visualization
+		 * IK CSV Visualizer (menu + cube + rig re-check)
+		 * Actions:
+		 *  - IK: Load & Visualize CSV
+		 *  - IK: Re-evaluate CSV with Current Rig
+		 *  - IK: Toggle CSV Bounding Box
+		 *  - IK: Clear CSV Visualization
 		 */
 		(function () {
 			if (!window.THREE) { console.warn('[ik_csv_visualizer] THREE missing'); return; }
 			const hasBB = typeof Blockbench !== 'undefined';
+			const PIXEL_POINT_SIZE = 3;     // smaller points
+			const DEFAULT_OK_EPS = 1e-2;    // green/red cutoff (absolute, not relative)
 
-			// ------- helpers -------
-			function greenRedColor01(t) {
-				t = Math.max(0, Math.min(1, t || 0));
-				return { r: t, g: 1 - t, b: 0 };
-			}
-			function readFileAsText(file) {
-				return new Promise((res, rej) => {
-					const fr = new FileReader();
-					fr.onload = () => res(String(fr.result || ''));
-					fr.onerror = rej;
-					fr.readAsText(file);
-				});
-			}
+			// ---------- utils ----------
+			function greenRed01(t) { t = Math.max(0, Math.min(1, t || 0)); return { r: t, g: 1 - t, b: 0 }; }
+			function readFileAsText(file) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result || '')); fr.onerror = rej; fr.readAsText(file); }); }
 			function parseCSV(text) {
 				const lines = String(text || '').replace(/\r/g, '').split('\n').filter(Boolean);
 				if (!lines.length) return [];
 				const head = lines.shift().split(',').map(s => s.trim());
-				const rows = [];
-				for (const ln of lines) {
-					const cols = ln.split(',').map(s => s.trim());
-					const r = {};
+				return lines.map(ln => {
+					const cols = ln.split(',').map(s => s.trim()); const r = {};
 					for (let i = 0; i < head.length; i++) {
-						const k = head[i];
-						const v = cols[i];
+						const k = head[i], v = cols[i];
 						if (k === 'ok') r.ok = (v === '1' || String(v).toLowerCase() === 'true');
 						else r[k] = Number(v);
 					}
-					rows.push(r);
-				}
-				return rows;
+					return r;
+				});
 			}
 			function pickCSVs() {
 				return new Promise(resolve => {
 					const input = document.createElement('input');
-					input.type = 'file';
-					input.accept = '.csv,text/csv';
-					input.multiple = true;
-					input.style.display = 'none';
+					input.type = 'file'; input.accept = '.csv,text/csv'; input.multiple = true; input.style.display = 'none';
 					document.body.appendChild(input);
-					input.addEventListener('change', () => {
-						const files = Array.from(input.files || []);
-						document.body.removeChild(input);
-						resolve(files);
-					}, { once: true });
+					input.addEventListener('change', () => { const files = Array.from(input.files || []); document.body.removeChild(input); resolve(files); }, { once: true });
 					input.click();
 				});
 			}
 
-			// ------- scene objects & lifecycle -------
-			let csvPointsOK = null, csvPointsFail = null, csvCircleLine = null;
+			// ---------- Blockbench rig helpers ----------
+			function findSelectedNullAndAnimator() {
+				const sel = Outliner?.selected?.[0];
+				if (!(sel && sel instanceof NullObject)) { Blockbench.showQuickMessage('Select a Null Object (IK controller) first.'); return null; }
+				let anim = null;
+				if (Animation?.selected?.animators) for (const a of Object.values(Animation.selected.animators)) {
+					if (a instanceof NullObjectAnimator && a.uuid === sel.uuid) { anim = a; break; }
+				}
+				if (!anim) { Blockbench.showQuickMessage('No NullObjectAnimator found for the selected null in this animation.'); return null; }
+				return { nullObj: sel, anim };
+			}
+			function setNullWorldPosition(nullObj, worldV3) {
+				const parent = nullObj.mesh.parent || scene;
+				const local = worldV3.clone(); parent.worldToLocal(local);
+				nullObj.mesh.position.copy(local); nullObj.mesh.updateMatrixWorld();
+			}
+
+			// ---------- scene state ----------
+			let gridRows = null, circleRows = null; // current datasets
+			let csvPointsOK = null, csvPointsFail = null, csvCircleLine = null, csvBoxHelper = null;
 
 			function disposeObj(obj) {
 				try {
@@ -185,144 +183,216 @@
 				} catch { }
 			}
 			function clearCSVMeshes() {
-				for (const obj of [csvPointsOK, csvPointsFail, csvCircleLine]) {
+				for (const obj of [csvPointsOK, csvPointsFail, csvCircleLine, csvBoxHelper]) {
 					if (obj && window.scene) scene.remove(obj);
-					disposeObj(obj);
+					// Box3Helper has no geometry/material dispose safely; ignore dispose for helper
+					if (obj !== csvBoxHelper) disposeObj(obj);
 				}
-				csvPointsOK = csvPointsFail = csvCircleLine = null;
+				csvPointsOK = csvPointsFail = csvCircleLine = csvBoxHelper = null;
 			}
 
-			// ------- render from CSV -------
-			function renderCSV(gridRows, circleRows, opts = {}) {
-				const pointSize = Number(opts.pointSize ?? 6);       // in world units (PointsMaterial size)
-				const okThreshold = Number(opts.okThreshold ?? 1e-2); // used only if "ok" missing
+			function computeBounds(rowsList) {
+				const b = new THREE.Box3();
+				let init = false;
+				for (const rows of rowsList) {
+					if (!Array.isArray(rows)) continue;
+					for (const r of rows) {
+						if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
+						const v = new THREE.Vector3(r.x, r.y, r.z);
+						if (!init) { b.min.copy(v); b.max.copy(v); init = true; } else b.expandByPoint(v);
+					}
+				}
+				return init ? b : null;
+			}
+
+			function ensureBoxHelper() {
+				if (csvBoxHelper) { scene.add(csvBoxHelper); return; }
+				const bounds = computeBounds([gridRows, circleRows]);
+				if (!bounds) return;
+				csvBoxHelper = new THREE.Box3Helper(bounds, new THREE.Color(0x00aaff));
+				scene.add(csvBoxHelper);
+			}
+
+			// ---------- renderer ----------
+			function renderCSV({ pointSizePx = PIXEL_POINT_SIZE, okEps = DEFAULT_OK_EPS, colorBy = 'error' } = {}) {
+				// colorBy: 'error' (absolute), 'ok' (strict green/red), 'relative' (normalize to max)
 				clearCSVMeshes();
 
+				// collect error ranges
 				const allErrs = [];
-				if (Array.isArray(gridRows)) allErrs.push(...gridRows.map(r => r.posErr).filter(Number.isFinite));
-				if (Array.isArray(circleRows)) allErrs.push(...circleRows.map(r => r.posErr).filter(Number.isFinite));
+				if (Array.isArray(gridRows)) allErrs.push(...gridRows.map(r => r.posErrRig ?? r.posErr).filter(Number.isFinite));
+				if (Array.isArray(circleRows)) allErrs.push(...circleRows.map(r => r.posErrRig ?? r.posErr).filter(Number.isFinite));
 				const maxErr = Math.max(1e-9, allErrs.length ? Math.max(...allErrs) : 1);
 
-				// --- GRID as two point clouds (ok vs fail) ---
+				// --- GRID points (ok/fail split) ---
 				if (Array.isArray(gridRows) && gridRows.length) {
-					const posOK = [], colOK = [];
-					const posFail = [], colFail = [];
+					const posOK = [], colOK = [], posFail = [], colFail = [];
 					let total = 0, pass = 0;
-
 					for (const r of gridRows) {
-						if (![r.x, r.y, r.z, r.posErr].every(Number.isFinite)) continue;
-						const ok = (typeof r.ok === 'boolean') ? r.ok : (r.posErr <= okThreshold);
-						const norm = Math.min(Math.max(r.posErr / maxErr, 0), 1);
-						const c = greenRedColor01(norm);
+						if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
+						const err = Number.isFinite(r.posErrRig) ? r.posErrRig : r.posErr;
+						const ok = (typeof r.okRig === 'boolean') ? r.okRig
+							: (typeof r.ok === 'boolean') ? r.ok
+								: (err <= okEps);
+						let t;
+						if (colorBy === 'ok') t = ok ? 0 : 1;
+						else if (colorBy === 'relative') t = Math.min(Math.max(err / maxErr, 0), 1);
+						else /* 'error' absolute */    t = Math.min(Math.max(err / okEps, 0), 1); // >1 goes red
+						const c = greenRed01(t);
 						const pArr = [r.x, r.y, r.z];
 						if (ok) { posOK.push(...pArr); colOK.push(c.r, c.g, c.b); pass++; }
 						else { posFail.push(...pArr); colFail.push(c.r, c.g, c.b); }
 						total++;
 					}
-
 					if (posOK.length) {
 						const g = new THREE.BufferGeometry();
 						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posOK), 3));
 						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colOK), 3));
-						const m = new THREE.PointsMaterial({ size: pointSize, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95 });
-						csvPointsOK = new THREE.Points(g, m);
-						scene.add(csvPointsOK);
+						const m = new THREE.PointsMaterial({ size: pointSizePx, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95 });
+						csvPointsOK = new THREE.Points(g, m); scene.add(csvPointsOK);
 					}
 					if (posFail.length) {
 						const g = new THREE.BufferGeometry();
 						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posFail), 3));
 						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colFail), 3));
-						const m = new THREE.PointsMaterial({ size: pointSize, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95 });
-						csvPointsFail = new THREE.Points(g, m);
-						scene.add(csvPointsFail);
+						const m = new THREE.PointsMaterial({ size: pointSizePx, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95 });
+						csvPointsFail = new THREE.Points(g, m); scene.add(csvPointsFail);
 					}
-
-					if (hasBB) Blockbench.showQuickMessage(`Grid: ${pass}/${total} passed (ε=${okThreshold}).`);
+					if (hasBB) Blockbench.showQuickMessage(`Grid: ${pass}/${total} passed (ε=${okEps}).`);
 				}
 
 				// --- CIRCLE as colored polyline ---
 				if (Array.isArray(circleRows) && circleRows.length >= 2) {
 					const pos = [], col = [];
 					for (const r of circleRows) {
-						if (![r.x, r.y, r.z, r.posErr].every(Number.isFinite)) continue;
-						const norm = Math.min(Math.max(r.posErr / maxErr, 0), 1);
-						const c = greenRedColor01(norm);
-						pos.push(r.x, r.y, r.z);
-						col.push(c.r, c.g, c.b);
+						if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
+						const err = Number.isFinite(r.posErrRig) ? r.posErrRig : r.posErr;
+						let t;
+						if (colorBy === 'ok') t = (err <= okEps) ? 0 : 1;
+						else if (colorBy === 'relative') t = Math.min(Math.max(err / maxErr, 0), 1);
+						else t = Math.min(Math.max(err / okEps, 0), 1);
+						const c = greenRed01(t);
+						pos.push(r.x, r.y, r.z); col.push(c.r, c.g, c.b);
 					}
-					if (pos.length >= 6) {
-						const g = new THREE.BufferGeometry();
-						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pos), 3));
-						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(col), 3));
-						const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
-						csvCircleLine = new THREE.Line(g, m);
-						scene.add(csvCircleLine);
-					}
+					const g = new THREE.BufferGeometry();
+					g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pos), 3));
+					g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(col), 3));
+					const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
+					csvCircleLine = new THREE.Line(g, m); scene.add(csvCircleLine);
 				}
+
+				ensureBoxHelper(); // draw cube bounds
 			}
 
-			// ------- action handlers -------
-			async function onLoadAndVisualize() {
+			// ---------- actions ----------
+			async function actLoad() {
 				try {
-					const files = await pickCSVs();
-					if (!files || !files.length) { if (hasBB) Blockbench.showQuickMessage('No CSV selected'); return; }
+					const files = await pickCSVs(); if (!files?.length) { if (hasBB) Blockbench.showQuickMessage('No CSV selected'); return; }
 					const texts = await Promise.all(files.map(readFileAsText));
-					const datasets = texts.map(parseCSV).filter(arr => arr && arr.length);
+					const sets = texts.map(parseCSV).filter(a => a?.length);
 
-					let gridRows = null, circleRows = null;
-					for (const rows of datasets) {
-						const first = rows[0] || {};
-						const isGrid = ('ix' in first) && ('iy' in first);
-						const isCircle = !isGrid && ('i' in first);
+					gridRows = null; circleRows = null;
+					for (const rows of sets) {
+						const f = rows[0] || {};
+						const isGrid = ('ix' in f) && ('iy' in f);
+						const isCircle = !isGrid && ('i' in f);
 						if (isGrid) gridRows = rows;
 						else if (isCircle) circleRows = rows;
 					}
-					if (!gridRows && !circleRows) {
-						if (hasBB) Blockbench.showQuickMessage('Could not recognize CSV columns. Expected ix,iy,x,y,z,posErr,ok (grid) or i,x,y,z,posErr,ok (circle).');
-						return;
-					}
-					renderCSV(gridRows, circleRows, { pointSize: 6, okThreshold: 1e-2 });
-				} catch (e) {
-					console.error(e);
-					if (hasBB) Blockbench.showQuickMessage('CSV load failed. See console for details.');
-				}
-			}
-			function onClear() {
-				clearCSVMeshes();
-				if (hasBB) Blockbench.showQuickMessage('CSV visualization cleared.');
+					if (!gridRows && !circleRows) { Blockbench.showQuickMessage('Unrecognized CSV headers. Need ix,iy,x,y,z,posErr,ok (grid) or i,x,y,z,posErr,ok (circle).'); return; }
+					renderCSV({ colorBy: 'error' }); // absolute ε mapping
+				} catch (e) { console.error(e); Blockbench.showQuickMessage('CSV load failed. See console.'); }
 			}
 
-			// ------- register actions -------
-			if (typeof BARS !== 'undefined') {
+			async function actRecheckRig() {
+				if (!gridRows && !circleRows) { Blockbench.showQuickMessage('Load CSV first.'); return; }
+				const ctx = findSelectedNullAndAnimator(); if (!ctx) return;
+				const { nullObj, anim } = ctx;
+
+				// store/restore null position
+				const origPos = nullObj.mesh.getWorldPosition(new THREE.Vector3());
+				const eps = DEFAULT_OK_EPS;
+
+				function evalRows(rows) {
+					if (!Array.isArray(rows)) return;
+					for (const r of rows) {
+						if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
+						setNullWorldPosition(nullObj, new THREE.Vector3(r.x, r.y, r.z));
+						const res = anim.displayIK(true); // patched to return __metrics
+						const m = (res && res.__metrics) || { posErr: Number.POSITIVE_INFINITY };
+						r.posErrRig = m.posErr;
+						r.okRig = (m.posErr <= eps);
+					}
+				}
+				evalRows(gridRows);
+				evalRows(circleRows);
+
+				// restore and refresh once
+				setNullWorldPosition(nullObj, origPos);
+				anim.displayIK(false);
+
+				renderCSV({ colorBy: 'error' });
+				Blockbench.showQuickMessage('CSV re-evaluated with current rig limits.');
+			}
+
+			function actToggleBox() {
+				if (!csvBoxHelper) { ensureBoxHelper(); Blockbench.showQuickMessage('Bounding box shown.'); return; }
+				csvBoxHelper.visible = !csvBoxHelper.visible;
+				Blockbench.showQuickMessage(csvBoxHelper.visible ? 'Bounding box shown.' : 'Bounding box hidden.');
+			}
+
+			function actClear() { clearCSVMeshes(); Blockbench.showQuickMessage('CSV visualization cleared.'); }
+
+			// ---------- register actions + robust menu attach ----------
+			function registerActions() {
+				if (typeof BARS === 'undefined') return false;
 				BARS.defineActions(() => {
 					new Action('ik_load_csv_visualizer', {
-						icon: 'scatter_plot',
-						name: 'IK: Load & Visualize CSV',
-						condition: () => Modes.animate,
-						click: onLoadAndVisualize
+						icon: 'scatter_plot', name: 'IK: Load & Visualize CSV', condition: () => Modes.animate, click: actLoad
+					});
+					new Action('ik_recheck_csv_with_rig', {
+						icon: 'autorenew', name: 'IK: Re-evaluate CSV with Current Rig', condition: () => Modes.animate, click: actRecheckRig
+					});
+					new Action('ik_toggle_csv_box', {
+						icon: 'crop_din', name: 'IK: Toggle CSV Bounding Box', condition: () => Modes.animate, click: actToggleBox
 					});
 					new Action('ik_clear_csv_visualizer', {
-						icon: 'layers_clear',
-						name: 'IK: Clear CSV Visualization',
-						condition: () => Modes.animate,
-						click: onClear
+						icon: 'layers_clear', name: 'IK: Clear CSV Visualization', condition: () => Modes.animate, click: actClear
 					});
 				});
+				return true;
 			}
 
-			// Try to attach both actions into the Animation menu if available now;
-			// If menu builds later, the actions are still searchable via Ctrl/Cmd+P.
-			try {
-				if (window.BarItems && BarItems.animation_menu && Array.isArray(BarItems.animation_menu.children)) {
-					BarItems.animation_menu.children.push('_');
-					BarItems.animation_menu.children.push('ik_load_csv_visualizer');
-					BarItems.animation_menu.children.push('ik_clear_csv_visualizer');
-				}
-			} catch { }
+			function attachToMenus() {
+				try {
+					if (!window.BarItems) return false;
+					const menus = [BarItems.animation_menu, BarItems.tools_menu].filter(Boolean);
+					if (!menus.length) return false;
+					for (const m of menus) {
+						if (!Array.isArray(m.children)) continue;
+						// avoid duplicates
+						['ik_load_csv_visualizer', 'ik_recheck_csv_with_rig', 'ik_toggle_csv_box', 'ik_clear_csv_visualizer'].forEach(id => {
+							if (!m.children.includes(id)) m.children.push(id);
+						});
+					}
+					return true;
+				} catch { return false; }
+			}
 
-			console.log('[ik_csv_visualizer] Ready: use “IK: Load & Visualize CSV” (Animation menu or search).');
+			// Try now, then keep nudging until UI is ready
+			let actionsReady = registerActions();
+			let menusReady = attachToMenus();
+
+			const tick = setInterval(() => {
+				if (!actionsReady) actionsReady = registerActions();
+				if (!menusReady) menusReady = attachToMenus();
+				if (actionsReady && menusReady) clearInterval(tick);
+			}, 250);
+
+			console.log('[ik_csv_visualizer] Ready. Find under Animation/Tools menus or via search.');
 		})();
 	</script>
+
 
 	<script src="js/interface/themes.js"></script>
 	<script src="js/interface/shared_actions.js"></script>
