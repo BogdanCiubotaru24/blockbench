@@ -48,4 +48,26 @@ describe('TwoBoneChain CCD with hinge constraints', () => {
       }
     ), { numRuns: 150 });
   });
+
+  it('solves an out-of-plane target with orthogonal hinge axes', () => {
+    const L1 = 1.0, L2 = 0.7;
+    const chain = new TwoBoneChain(L1, L2, {
+      axis0: new THREE.Vector3(0,0,1), // shoulder yaw
+      axis1: new THREE.Vector3(0,1,0), // elbow flexion about Y
+      lim0: { min: -Math.PI*0.9, max: Math.PI*0.9 },
+      lim1: { min: 0,              max: Math.PI*0.95 }
+    });
+
+    const phi = 0.9;
+    const theta = -0.6;
+    chain.q0.setFromAxisAngle(chain.axis0, theta);
+    chain.q1.setFromAxisAngle(chain.axis1, phi);
+    const { p2 } = chain.fk();
+
+    chain.q0.set(0,0,0,1);
+    chain.q1.set(0,0,0,1);
+
+    const res = chain.solve(p2, { maxIters: 200, tol: 1e-2 });
+    expect(res.err).toBeLessThan(1e-2);
+  });
 });
