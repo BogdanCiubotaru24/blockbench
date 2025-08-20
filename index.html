@@ -168,9 +168,10 @@
 				nullObj.mesh.position.copy(local); nullObj.mesh.updateMatrixWorld();
 			}
 
-			// ---------- scene state ----------
-			let gridRows = null, circleRows = null; // current datasets
-			let csvPointsOK = null, csvPointsFail = null, csvCircleLine = null, csvBoxHelper = null;
+                        // ---------- scene state ----------
+                        let gridRows = null, circleRows = null; // current datasets
+                        let csvPointSets = [], csvCircleLines = [], csvBoxHelper = null;
+                        let lastMetrics = ['posErr'];
 
 			function disposeObj(obj) {
 				try {
@@ -182,14 +183,22 @@
 					}
 				} catch { }
 			}
-			function clearCSVMeshes() {
-				for (const obj of [csvPointsOK, csvPointsFail, csvCircleLine, csvBoxHelper]) {
-					if (obj && window.scene) scene.remove(obj);
-					// Box3Helper has no geometry/material dispose safely; ignore dispose for helper
-					if (obj !== csvBoxHelper) disposeObj(obj);
-				}
-				csvPointsOK = csvPointsFail = csvCircleLine = csvBoxHelper = null;
-			}
+                        function clearCSVMeshes() {
+                                for (const set of csvPointSets) {
+                                        for (const obj of [set.ok, set.fail]) {
+                                                if (obj && window.scene) scene.remove(obj);
+                                                disposeObj(obj);
+                                        }
+                                }
+                                for (const line of csvCircleLines) {
+                                        if (line && window.scene) scene.remove(line);
+                                        disposeObj(line);
+                                }
+                                if (csvBoxHelper && window.scene) scene.remove(csvBoxHelper);
+                                csvPointSets = [];
+                                csvCircleLines = [];
+                                csvBoxHelper = null;
+                        }
 
 			function computeBounds(rowsList) {
 				const b = new THREE.Box3();
@@ -214,95 +223,111 @@
 			}
 
 			// ---------- renderer ----------
-			function renderCSV({ pointSizePx = PIXEL_POINT_SIZE, okEps = DEFAULT_OK_EPS, colorBy = 'error' } = {}) {
-				// colorBy: 'error' (absolute), 'ok' (strict green/red), 'relative' (normalize to max)
-				clearCSVMeshes();
+                        function renderCSV({ pointSizePx = PIXEL_POINT_SIZE, metrics = ['posErr'] } = {}) {
+                                clearCSVMeshes();
+                                metrics = Array.isArray(metrics) && metrics.length ? metrics : ['posErr'];
+                                lastMetrics = metrics.slice();
 
-				// collect error ranges
-				const allErrs = [];
-				if (Array.isArray(gridRows)) allErrs.push(...gridRows.map(r => r.posErrRig ?? r.posErr).filter(Number.isFinite));
-				if (Array.isArray(circleRows)) allErrs.push(...circleRows.map(r => r.posErrRig ?? r.posErr).filter(Number.isFinite));
-				const maxErr = Math.max(1e-9, allErrs.length ? Math.max(...allErrs) : 1);
+                                for (const metric of metrics) {
+                                        // collect ranges for this metric
+                                        const allVals = [];
+                                        if (Array.isArray(gridRows)) allVals.push(...gridRows.map(r => r[metric]).filter(Number.isFinite));
+                                        if (Array.isArray(circleRows)) allVals.push(...circleRows.map(r => r[metric]).filter(Number.isFinite));
+                                        const maxVal = Math.max(1e-9, allVals.length ? Math.max(...allVals) : 1);
 
-				// --- GRID points (ok/fail split) ---
-				if (Array.isArray(gridRows) && gridRows.length) {
-					const posOK = [], colOK = [], posFail = [], colFail = [];
-					let total = 0, pass = 0;
-					for (const r of gridRows) {
-						if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
-						const err = Number.isFinite(r.posErrRig) ? r.posErrRig : r.posErr;
-						const ok = (typeof r.okRig === 'boolean') ? r.okRig
-							: (typeof r.ok === 'boolean') ? r.ok
-								: (err <= okEps);
-						let t;
-						if (colorBy === 'ok') t = ok ? 0 : 1;
-						else if (colorBy === 'relative') t = Math.min(Math.max(err / maxErr, 0), 1);
-						else /* 'error' absolute */    t = Math.min(Math.max(err / okEps, 0), 1); // >1 goes red
-						const c = greenRed01(t);
-						const pArr = [r.x, r.y, r.z];
-						if (ok) { posOK.push(...pArr); colOK.push(c.r, c.g, c.b); pass++; }
-						else { posFail.push(...pArr); colFail.push(c.r, c.g, c.b); }
-						total++;
-					}
-					if (posOK.length) {
-						const g = new THREE.BufferGeometry();
-						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posOK), 3));
-						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colOK), 3));
-						const m = new THREE.PointsMaterial({ size: pointSizePx, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95 });
-						csvPointsOK = new THREE.Points(g, m); scene.add(csvPointsOK);
-					}
-					if (posFail.length) {
-						const g = new THREE.BufferGeometry();
-						g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posFail), 3));
-						g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colFail), 3));
-						const m = new THREE.PointsMaterial({ size: pointSizePx, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95 });
-						csvPointsFail = new THREE.Points(g, m); scene.add(csvPointsFail);
-					}
-					if (hasBB) Blockbench.showQuickMessage(`Grid: ${pass}/${total} passed (ε=${okEps}).`);
-				}
+                                        // --- GRID points (ok/fail split) ---
+                                        if (Array.isArray(gridRows) && gridRows.length) {
+                                                const posOK = [], colOK = [], posFail = [], colFail = [];
+                                                let total = 0, pass = 0;
+                                                for (const r of gridRows) {
+                                                        if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
+                                                        const val = r[metric];
+                                                        if (!Number.isFinite(val)) continue;
+                                                        const ok = (typeof r.okRig === 'boolean') ? r.okRig
+                                                                : (typeof r.ok === 'boolean') ? r.ok
+                                                                        : (metric === 'posErr' ? (val <= DEFAULT_OK_EPS) : true);
+                                                        const t = Math.min(Math.max(val / maxVal, 0), 1);
+                                                        const c = greenRed01(t);
+                                                        const pArr = [r.x, r.y, r.z];
+                                                        if (ok) { posOK.push(...pArr); colOK.push(c.r, c.g, c.b); pass++; }
+                                                        else { posFail.push(...pArr); colFail.push(c.r, c.g, c.b); }
+                                                        total++;
+                                                }
+                                                const set = { ok: null, fail: null };
+                                                if (posOK.length) {
+                                                        const g = new THREE.BufferGeometry();
+                                                        g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posOK), 3));
+                                                        g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colOK), 3));
+                                                        const m = new THREE.PointsMaterial({ size: pointSizePx, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95 });
+                                                        set.ok = new THREE.Points(g, m); scene.add(set.ok);
+                                                }
+                                                if (posFail.length) {
+                                                        const g = new THREE.BufferGeometry();
+                                                        g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(posFail), 3));
+                                                        g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colFail), 3));
+                                                        const m = new THREE.PointsMaterial({ size: pointSizePx, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95 });
+                                                        set.fail = new THREE.Points(g, m); scene.add(set.fail);
+                                                }
+                                                csvPointSets.push(set);
+                                                if (hasBB) Blockbench.showQuickMessage(`Grid (${metric}): ${pass}/${total} passed.`);
+                                        }
 
-				// --- CIRCLE as colored polyline ---
-				if (Array.isArray(circleRows) && circleRows.length >= 2) {
-					const pos = [], col = [];
-					for (const r of circleRows) {
-						if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
-						const err = Number.isFinite(r.posErrRig) ? r.posErrRig : r.posErr;
-						let t;
-						if (colorBy === 'ok') t = (err <= okEps) ? 0 : 1;
-						else if (colorBy === 'relative') t = Math.min(Math.max(err / maxErr, 0), 1);
-						else t = Math.min(Math.max(err / okEps, 0), 1);
-						const c = greenRed01(t);
-						pos.push(r.x, r.y, r.z); col.push(c.r, c.g, c.b);
-					}
-					const g = new THREE.BufferGeometry();
-					g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pos), 3));
-					g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(col), 3));
-					const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
-					csvCircleLine = new THREE.Line(g, m); scene.add(csvCircleLine);
-				}
+                                        // --- CIRCLE as colored polyline ---
+                                        if (Array.isArray(circleRows) && circleRows.length >= 2) {
+                                                const pos = [], col = [];
+                                                for (const r of circleRows) {
+                                                        if (![r.x, r.y, r.z].every(Number.isFinite)) continue;
+                                                        const val = r[metric];
+                                                        if (!Number.isFinite(val)) continue;
+                                                        const t = Math.min(Math.max(val / maxVal, 0), 1);
+                                                        const c = greenRed01(t);
+                                                        pos.push(r.x, r.y, r.z); col.push(c.r, c.g, c.b);
+                                                }
+                                                const g = new THREE.BufferGeometry();
+                                                g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pos), 3));
+                                                g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(col), 3));
+                                                const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 });
+                                                const line = new THREE.Line(g, m); scene.add(line);
+                                                csvCircleLines.push(line);
+                                        }
+                                }
 
-				ensureBoxHelper(); // draw cube bounds
-			}
+                                ensureBoxHelper(); // draw cube bounds
+                        }
 
 			// ---------- actions ----------
-			async function actLoad() {
-				try {
-					const files = await pickCSVs(); if (!files?.length) { if (hasBB) Blockbench.showQuickMessage('No CSV selected'); return; }
-					const texts = await Promise.all(files.map(readFileAsText));
-					const sets = texts.map(parseCSV).filter(a => a?.length);
+                        async function actLoad() {
+                                try {
+                                        const files = await pickCSVs(); if (!files?.length) { if (hasBB) Blockbench.showQuickMessage('No CSV selected'); return; }
+                                        const texts = await Promise.all(files.map(readFileAsText));
+                                        const sets = texts.map(parseCSV).filter(a => a?.length);
 
-					gridRows = null; circleRows = null;
-					for (const rows of sets) {
-						const f = rows[0] || {};
-						const isGrid = ('ix' in f) && ('iy' in f);
-						const isCircle = !isGrid && ('i' in f);
-						if (isGrid) gridRows = rows;
-						else if (isCircle) circleRows = rows;
-					}
-					if (!gridRows && !circleRows) { Blockbench.showQuickMessage('Unrecognized CSV headers. Need ix,iy,x,y,z,posErr,ok (grid) or i,x,y,z,posErr,ok (circle).'); return; }
-					renderCSV({ colorBy: 'error' }); // absolute ε mapping
-				} catch (e) { console.error(e); Blockbench.showQuickMessage('CSV load failed. See console.'); }
-			}
+                                        gridRows = null; circleRows = null;
+                                        for (const rows of sets) {
+                                                const f = rows[0] || {};
+                                                const isGrid = ('ix' in f) && ('iy' in f);
+                                                const isCircle = !isGrid && ('i' in f);
+                                                if (isGrid) gridRows = rows;
+                                                else if (isCircle) circleRows = rows;
+                                        }
+                                        if (!gridRows && !circleRows) { Blockbench.showQuickMessage('Unrecognized CSV headers. Need ix,iy(,iz),x,y,z,posErr,targetDist,ok (grid) or i,x,y,z,posErr,ok (circle).'); return; }
+                                        new Dialog({
+                                                id: 'ik_csv_metrics',
+                                                title: 'Visualize CSV Metrics',
+                                                width: 260,
+                                                form: {
+                                                        err:  { label: 'Positional error', type: 'checkbox', value: true },
+                                                        dist: { label: 'Distance to target', type: 'checkbox', value: false }
+                                                },
+                                                onConfirm(form) {
+                                                        const metrics = [];
+                                                        if (form.err) metrics.push('posErr');
+                                                        if (form.dist) metrics.push('targetDist');
+                                                        renderCSV({ metrics });
+                                                }
+                                        }).show();
+                                } catch (e) { console.error(e); Blockbench.showQuickMessage('CSV load failed. See console.'); }
+                        }
 
 			async function actRecheckRig() {
 				if (!gridRows && !circleRows) { Blockbench.showQuickMessage('Load CSV first.'); return; }
@@ -331,9 +356,9 @@
 				setNullWorldPosition(nullObj, origPos);
 				anim.displayIK(false);
 
-				renderCSV({ colorBy: 'error' });
-				Blockbench.showQuickMessage('CSV re-evaluated with current rig limits.');
-			}
+                                renderCSV({ metrics: lastMetrics });
+                                Blockbench.showQuickMessage('CSV re-evaluated with current rig limits.');
+                        }
 
 			function actToggleBox() {
 				if (!csvBoxHelper) { ensureBoxHelper(); Blockbench.showQuickMessage('Bounding box shown.'); return; }
