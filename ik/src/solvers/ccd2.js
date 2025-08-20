@@ -1,7 +1,8 @@
 /**
- * Hinge-aware, warm-started 2-bone planar CCD solver.
+ * Hinge-aware, warm-started 2-bone CCD solver.
  * - Root at origin, links rest along +X
- * - Joints are hinges about axis0, axis1 (default Z), so motion is planar in XY.
+ * - Joints are hinges about arbitrary axes `axis0` and `axis1` (defaults Z)
+ *   allowing out-of-plane motion.
  */
 const THREE = require('three');
 const { clampHinge } = require('../math/ik_constraints');
@@ -44,13 +45,16 @@ class TwoBoneChain {
     const p1 = p0.clone().add(xAxis.clone().applyQuaternion(q0w).multiplyScalar(this.L1));
     const q1w = q0w.clone().multiply(this.q1);
     const p2 = p1.clone().add(xAxis.clone().applyQuaternion(q1w).multiplyScalar(this.L2));
-    return { p0, p1, p2, q0w, q1w };
+    const a0w = this.axis0.clone(); // root is world
+    const a1w = this.axis1.clone().applyQuaternion(q0w);
+    return { p0, p1, p2, q0w, q1w, a0w, a1w };
   }
 
   /**
-   * Analytic warm start for a planar 2-bone chain.
-   * Elbow angle (phi) from law of cosines; shoulder angle (theta) by triangle geometry.
-   * IMPORTANT: wrap theta by ±2π into [lim0.min, lim0.max] (not just clamp).
+   * Analytic warm start for a 2-bone chain in 3D.
+   * Elbow angle (phi) from law of cosines; shoulder angle (theta) by
+   * projecting the target onto the shoulder hinge plane. The resulting
+   * angles are wrapped/clamped into their legal ranges.
    */
   warmStart(target) {
     const L1 = this.L1, L2 = this.L2;
@@ -58,17 +62,29 @@ class TwoBoneChain {
     const r = Math.min(reach - 1e-5, Math.max(1e-5, target.length()));
 
     let cosPhi = (r*r - L1*L1 - L2*L2) / (2 * L1 * L2);
-    cosPhi = Math.max(-1, Math.min(1, cosPhi));
+    cosPhi = THREE.MathUtils.clamp(cosPhi, -1, 1);
     let phi = Math.acos(cosPhi); // elbow flexion (>=0)
-    // Respect elbow hinge limits
     phi = THREE.MathUtils.clamp(phi, this.lim1.min, this.lim1.max);
 
-    const thetaTarget = Math.atan2(target.y, target.x);
-    const thetaOffset  = Math.atan2(L2 * Math.sin(phi), L1 + L2 * Math.cos(phi));
-    const thetaRaw     = thetaTarget - thetaOffset;
+    // Shoulder angle around axis0 from projection onto hinge plane
+    const axis0 = this.axis0;
+    const xAxis = new THREE.Vector3(1,0,0);
+    const t_proj = target.clone().sub(axis0.clone().multiplyScalar(axis0.dot(target)));
+    const x_proj = xAxis.clone().sub(axis0.clone().multiplyScalar(axis0.dot(xAxis)));
 
-    // Wrap theta into the legal shoulder interval by adding/subtracting 2π
-    const theta = wrapAngleIntoLimits(thetaRaw, this.lim0.min, this.lim0.max);
+    let theta = 0;
+    const n_t = t_proj.length();
+    const n_x = x_proj.length();
+    if (n_t >= 1e-9 && n_x >= 1e-9) {
+      const a = x_proj.clone().multiplyScalar(1 / n_x);
+      const b = t_proj.clone().multiplyScalar(1 / n_t);
+      const sin = axis0.clone().dot(a.clone().cross(b));
+      const cos = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+      const thetaTarget = Math.atan2(sin, cos);
+      const thetaOffset  = Math.atan2(L2 * Math.sin(phi), L1 + L2 * Math.cos(phi));
+      const thetaRaw     = thetaTarget - thetaOffset;
+      theta = wrapAngleIntoLimits(thetaRaw, this.lim0.min, this.lim0.max);
+    }
 
     this.q0.setFromAxisAngle(this.axis0, theta);
     this.q1.setFromAxisAngle(this.axis1, phi);
@@ -80,14 +96,11 @@ class TwoBoneChain {
 
   // Rotate a joint strictly about its hinge axis to align the chain toward target
   rotateJointAboutHinge(jIndex, target) {
-    const { p0, p1, p2, q0w } = this.fk();
+    const { p0, p1, p2, q0w, a0w, a1w } = this.fk();
 
     const parent_qw = (jIndex === 1) ? q0w : new THREE.Quaternion();
-    const jointAxisLocal = (jIndex === 1) ? this.axis1 : this.axis0;
-    const jointPos = (jIndex === 1) ? p1 : p0;
-
-    // World hinge axis
-    const axis_w = jointAxisLocal.clone().applyQuaternion(parent_qw).normalize();
+    const jointPos  = (jIndex === 1) ? p1 : p0;
+    const axis_w    = (jIndex === 1) ? a1w.clone() : a0w.clone();
 
     // Current and target vectors from the joint, projected onto hinge plane
     const v_cur = p2.clone().sub(jointPos);

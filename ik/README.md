@@ -13,7 +13,7 @@ npm install
 npm test
 ```
 - `constraints.spec.js` checks that `clampHinge` and `clampBall` keep rotations inside limits (property-based with fast-check).
-- `ccd2.spec.js` checks a minimal 2-bone planar chain converges to random reachable targets.
+- `ccd2.spec.js` checks a minimal 2-bone chain converges to random reachable targets.
 
 ## Produce a heatmap (CSV)
 ```bash
@@ -49,4 +49,5 @@ This writes `out/heatmap.csv` with (x,y,err,iters,ok). Open it in your favorite 
 ### Notes
 - Axes should be defined in the joint's **rest (local) frame**.
 - Keep units in **radians**.
-- For a 2-bone limb, make both joints `hinge` around the same axis (planar) and optionally add a small bias for your bend (pole) when choosing targets or when selecting the delta rotation axis.
+- For a planar 2-bone limb, make both joints `hinge` around the same axis. To obtain out-of-plane motion supply different axes for `axis0` and `axis1`.
+  You may optionally add a small bias for your bend (pole) when choosing targets or when selecting the delta rotation axis.
