@@ -730,103 +730,79 @@ class NullObjectAnimator extends BoneAnimator {
 			const q_local = bone_ref.bone.mesh.quaternion; // THREE stores local quaternion
 			let q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
 
-			// Constraints
-			const limitsEnabled = !!(window.IKConstraints) &&
-				!!(bone_ref.bone && bone_ref.bone.rotation_limit_enabled);
-			const isHinge = !!(limitsEnabled && bone_ref.bone.rotation_hinge_lock);
+                       // Constraints
+                       const limitsEnabled = !!(window.IKConstraints) &&
+                               !!(bone_ref.bone && bone_ref.bone.rotation_limit_enabled);
+                       let q_new = q_new_unclamped;
+                       if (limitsEnabled) {
+                               const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
+                               const axisLocal =
+                                       keep === 0 ? new THREE.Vector3(1, 0, 0) :
+                                               keep === 1 ? new THREE.Vector3(0, 1, 0) :
+                                                       new THREE.Vector3(0, 0, 1);
+                               const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180, -180, -180];
+                               const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180, 180, 180];
+                               if (bone_ref.bone.rotation_hinge_lock) {
+                                       const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                       const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
 
-			let q_new = q_new_unclamped;
+                                       // (Optional) small step cap about hinge axis to calm edges
+                                       const maxStep = Math.PI / 10; // ~18°
+                                       {
+                                               const axis = axisLocal;
+                                               const v = new THREE.Vector3(Reusable.quat1.x, Reusable.quat1.y, Reusable.quat1.z);
+                                               const signed = 2 * Math.atan2(v.dot(axis), Reusable.quat1.w);
+                                               const limited = THREE.MathUtils.clamp(signed, -maxStep, maxStep);
+                                               Reusable.quat1.setFromAxisAngle(axis, limited);
+                                               q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
+                                       }
 
-			if (isHinge) {
-				// Hinge projection in JOINT-LOCAL
-				const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
-				const axisLocal =
-					keep === 0 ? new THREE.Vector3(1, 0, 0) :
-						keep === 1 ? new THREE.Vector3(0, 1, 0) :
-							new THREE.Vector3(0, 0, 1);
+                                       // Project ABSOLUTE local pose to hinge limits (like the harness)
+                                       q_new = IKConstraints.clampHinge(q_new_unclamped, axisLocal, min, max);
+                               } else {
+                                       const other = [0, 1, 2].filter(idx => idx !== keep);
+                                       const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
+                                       const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
+                                       const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                       const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                                       q_new = IKConstraints.clampBall(q_new_unclamped, axisLocal, swingX, swingY, twistMin, twistMax);
+                               }
+                       }
 
-				const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180, -180, -180];
-				const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180, 180, 180];
-				const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
-				const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-
-				// (Optional) small step cap about hinge axis to calm edges
-				const maxStep = Math.PI / 10; // ~18°
-				{
-					const axis = axisLocal;
-					const v = new THREE.Vector3(Reusable.quat1.x, Reusable.quat1.y, Reusable.quat1.z);
-					const signed = 2 * Math.atan2(v.dot(axis), Reusable.quat1.w);
-					const limited = THREE.MathUtils.clamp(signed, -maxStep, maxStep);
-					Reusable.quat1.setFromAxisAngle(axis, limited);
-					q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
-				}
-
-				// Project ABSOLUTE local pose to hinge limits (like the harness)
-				q_new = IKConstraints.clampHinge(q_new_unclamped, axisLocal, min, max);
-			}
-
-			// Write back LOCAL quaternion and sync Euler for UI
-			bone_ref.bone.mesh.quaternion.copy(q_new);
-			bone_ref.bone.mesh.rotation.setFromQuaternion(q_new, 'ZYX');
-			bone_ref.bone.mesh.updateMatrixWorld();
-
-			// Keep legacy Euler clamp/back-prop ONLY for non-hinge joints
-			if (!isHinge) {
-				Reusable.euler2.copy(bone_ref.bone.mesh.rotation);
-				this.clampRotation(bone_ref.bone);
-				bone_ref.bone.mesh.updateMatrixWorld();
-
-				Reusable.vec3.set(
-					Reusable.euler2.x - bone_ref.bone.mesh.rotation.x,
-					Reusable.euler2.y - bone_ref.bone.mesh.rotation.y,
-					Reusable.euler2.z - bone_ref.bone.mesh.rotation.z
-				);
-
-				if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
-					for (let j = i - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
-						let parent = bone_references[j].bone;
-						Reusable.euler2.copy(parent.mesh.rotation);
-						parent.mesh.rotation.x += Reusable.vec3.x;
-						parent.mesh.rotation.y += Reusable.vec3.y;
-						parent.mesh.rotation.z += Reusable.vec3.z;
-						this.clampRotation(parent);
-						parent.mesh.updateMatrixWorld();
-						Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
-						Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
-						Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
-					}
-				}
-			}
+                       // Write back LOCAL quaternion and sync Euler for UI
+                       bone_ref.bone.mesh.quaternion.copy(q_new);
+                       bone_ref.bone.mesh.rotation.setFromQuaternion(q_new, 'ZYX');
+                       bone_ref.bone.mesh.updateMatrixWorld();
 		});
 
-		if (target_original_quaternion) {
-			Reusable.euler2.copy(target.mesh.rotation);
-			target.mesh.quaternion.copy(target_original_quaternion);
-			let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
-			target.mesh.quaternion.premultiply(q1.invert());
-			this.clampRotation(target);
-			target.mesh.updateMatrixWorld();
-
-			Reusable.vec3.set(
-				Reusable.euler2.x - target.mesh.rotation.x,
-				Reusable.euler2.y - target.mesh.rotation.y,
-				Reusable.euler2.z - target.mesh.rotation.z
-			);
-			if (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5) {
-				for (let j = bone_references.length - 1; j >= 0 && (Math.abs(Reusable.vec3.x) > 1e-5 || Math.abs(Reusable.vec3.y) > 1e-5 || Math.abs(Reusable.vec3.z) > 1e-5); j--) {
-					let parent = bone_references[j].bone;
-					Reusable.euler2.copy(parent.mesh.rotation);
-					parent.mesh.rotation.x += Reusable.vec3.x;
-					parent.mesh.rotation.y += Reusable.vec3.y;
-					parent.mesh.rotation.z += Reusable.vec3.z;
-					this.clampRotation(parent);
-					parent.mesh.updateMatrixWorld();
-					Reusable.vec3.x -= parent.mesh.rotation.x - Reusable.euler2.x;
-					Reusable.vec3.y -= parent.mesh.rotation.y - Reusable.euler2.y;
-					Reusable.vec3.z -= parent.mesh.rotation.z - Reusable.euler2.z;
-				}
-			}
-		}
+               if (target_original_quaternion) {
+                       target.mesh.quaternion.copy(target_original_quaternion);
+                       let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
+                       target.mesh.quaternion.premultiply(q1.invert()).normalize();
+                       if (window.IKConstraints && target.rotation_limit_enabled) {
+                               const keep = Math.min(2, Math.max(0, Math.floor(target.rotation_hinge_axis || 0)));
+                               const axisLocal =
+                                       keep === 0 ? new THREE.Vector3(1, 0, 0) :
+                                               keep === 1 ? new THREE.Vector3(0, 1, 0) :
+                                                       new THREE.Vector3(0, 0, 1);
+                               const minArr = Array.isArray(target.rotation_limit_min) ? target.rotation_limit_min : [-180, -180, -180];
+                               const maxArr = Array.isArray(target.rotation_limit_max) ? target.rotation_limit_max : [180, 180, 180];
+                               if (target.rotation_hinge_lock) {
+                                       const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                       const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                                       target.mesh.quaternion.copy(IKConstraints.clampHinge(target.mesh.quaternion, axisLocal, min, max));
+                               } else {
+                                       const other = [0, 1, 2].filter(idx => idx !== keep);
+                                       const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
+                                       const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
+                                       const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                       const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                                       target.mesh.quaternion.copy(IKConstraints.clampBall(target.mesh.quaternion, axisLocal, swingX, swingY, twistMin, twistMax));
+                               }
+                       }
+                       target.mesh.rotation.setFromQuaternion(target.mesh.quaternion, 'ZYX');
+                       target.mesh.updateMatrixWorld();
+               }
 
 		let results = {};
 		if (get_samples) {
