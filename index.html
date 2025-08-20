@@ -230,11 +230,11 @@
 
                                for (const metric of metrics) {
                                        // Determine green/red threshold
-                                       // For positional and distance metrics we compare against an
-                                       // absolute epsilon so points near 0 stay green even if the
-                                       // dataset contains large outliers.
+                                       // Determine green/red threshold.
+                                       // posErr uses an absolute epsilon so points near 0 stay green even if
+                                       // the dataset contains large outliers; other metrics use a relative range.
                                        let maxVal;
-                                       if (metric === 'posErr' || metric === 'targetDist') {
+                                       if (metric === 'posErr') {
                                                maxVal = DEFAULT_OK_EPS;
                                        } else {
                                                // Fall back to relative range for any other metric
