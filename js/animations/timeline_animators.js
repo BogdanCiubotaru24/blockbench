@@ -676,16 +676,16 @@ class NullObjectAnimator extends BoneAnimator {
 		bones.reverse();
 
                let pole_locators = {};
-               bones.forEach(bone => {
-                       if (bone.rotation_hinge_lock && bone.rotation_pole_enabled) {
-                               let pole = bone.rotation_pole_uuid && PoleVector.all.find(l => l.uuid === bone.rotation_pole_uuid);
-
-                               if (!pole) {
-                                       pole = new PoleVector({name: bone.name + '_pole'}).addTo(null_object).init();
-                                       pole.createUniqueName();
-                                       const axisIndex = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
-                                       const axisVec = axisIndex === 0 ? new THREE.Vector3(1,0,0) : axisIndex === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
-                                       const axisWorld = axisVec.clone().applyQuaternion(bone.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
+              bones.forEach(bone => {
+                      let pole = bone.rotation_pole_uuid &&
+                              PoleVector.all.find(l => l.uuid === bone.rotation_pole_uuid);
+                      if (bone.rotation_hinge_lock && bone.rotation_pole_enabled) {
+                              if (!pole) {
+                                      pole = new PoleVector({name: bone.name + '_pole'}).addTo(null_object).init();
+                                      pole.createUniqueName();
+                                      const axisIndex = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
+                                      const axisVec = axisIndex === 0 ? new THREE.Vector3(1,0,0) : axisIndex === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
+                                      const axisWorld = axisVec.clone().applyQuaternion(bone.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
                                        const posWorld = bone.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
                                        null_object.mesh.worldToLocal(posWorld);
                                        pole.position.V3_set(posWorld);
@@ -697,12 +697,12 @@ class NullObjectAnimator extends BoneAnimator {
                                        pole.preview_controller.updateVisibility(pole);
                                }
                                pole_locators[bone.uuid] = pole;
-                       } else if (pole) {
-                               pole.visibility = false;
-                               pole.preview_controller.updateVisibility(pole);
-                               bone.rotation_pole_uuid = undefined;
-                       }
-               });
+                      } else if (pole) {
+                              pole.visibility = false;
+                              pole.preview_controller.updateVisibility(pole);
+                              bone.rotation_pole_uuid = undefined;
+                      }
+              });
 
                let base_rotations = {};
                bones.forEach(bone => {
