@@ -385,12 +385,19 @@ class Group extends OutlinerNode {
 		var obj = {
 			name: this.name
 		}
-		for (var key in Group.properties) {
-			Group.properties[key].copy(this, obj)
-		}
-		if (this.shade == false) {
-			obj.shade = false
-		}
+               for (var key in Group.properties) {
+                       Group.properties[key].copy(this, obj)
+               }
+               if (this.rotation_limit_enabled) {
+                       obj.rotation_limit_min = Array.isArray(this.rotation_limit_min) ? this.rotation_limit_min.slice() : [-180, -180, -180];
+                       obj.rotation_limit_max = Array.isArray(this.rotation_limit_max) ? this.rotation_limit_max.slice() : [180, 180, 180];
+               } else {
+                       delete obj.rotation_limit_min;
+                       delete obj.rotation_limit_max;
+               }
+               if (this.shade == false) {
+                       obj.shade = false
+               }
 		if (undo) {
 			obj.uuid = this.uuid;
 			obj.export = this.export;
