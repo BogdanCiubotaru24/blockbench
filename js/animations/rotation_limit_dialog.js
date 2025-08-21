@@ -14,6 +14,12 @@ var RotationLimitDialog = new Dialog({
         },
         methods: {
             load(groups) {
+                groups = (groups || []).filter(g => g instanceof Group);
+                if (!groups.length) {
+                    Blockbench.showMessageBox({title:'Select a bone', message:'Please select a bone to edit rotation limits.'});
+                    RotationLimitDialog.hide();
+                    return;
+                }
                 this.groups = groups;
                 this.values = {};
                 groups.forEach(g => {
@@ -67,6 +73,10 @@ var RotationLimitDialog = new Dialog({
 RotationLimitDialog.open = function(clicked_group) {
     let groups = Group.all.filter(g => g.selected);
     if (!groups.length && clicked_group) groups = [clicked_group];
+    if (!groups.length) {
+        Blockbench.showMessageBox({title:'Select a bone', message:'Please select a bone to edit rotation limits.'});
+        return;
+    }
     if (!this.content_vue) this.build();
     Vue.nextTick(() => this.content_vue.load(groups));
     this.show();
