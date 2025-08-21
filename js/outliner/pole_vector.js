@@ -37,6 +37,31 @@ class PoleVector extends OutlinerElement {
         save.type = 'pole_vector';
         return save;
     }
+    getWorldCenter(with_animation) {
+        var pos = new THREE.Vector3();
+        var q = Reusable.quat1.set(0, 0, 0, 1);
+        if (this.parent instanceof Group) {
+            THREE.fastWorldPosition(this.parent.mesh, pos);
+            this.parent.mesh.getWorldQuaternion(q);
+            var offset2 = Reusable.vec2.fromArray(this.parent.origin).applyQuaternion(q);
+            pos.sub(offset2);
+        }
+        let offset;
+        if (with_animation && Animation.selected) {
+            offset = Reusable.vec3.copy(this.mesh.position);
+            if (this.parent instanceof Group) {
+                offset.x += this.parent.origin[0];
+                offset.y += this.parent.origin[1];
+                offset.z += this.parent.origin[2];
+            }
+        } else {
+            offset = Reusable.vec3.fromArray(this.position);
+        }
+        offset.applyQuaternion(q);
+        pos.add(offset);
+
+        return pos;
+    }
     init() {
         if (this.parent instanceof Group == false) {
             this.addTo(Group.first_selected);
