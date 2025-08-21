@@ -65,7 +65,7 @@ var RotationLimitDialog = new Dialog({
 RotationLimitDialog.open = function(clicked_group) {
     let groups = Group.all.filter(g => g.selected);
     if (!groups.length) groups = [clicked_group];
-    this.content_vue.load(groups);
     this.show();
+    this.content_vue.load(groups);
 };
 
