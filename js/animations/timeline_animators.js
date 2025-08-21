@@ -675,6 +675,26 @@ class NullObjectAnimator extends BoneAnimator {
 		if (!bones.length) return;
 		bones.reverse();
 
+               let pole_locators = {};
+               bones.forEach(bone => {
+                       if (bone.rotation_hinge_lock) {
+                               let pole = bone.rotation_pole_uuid && Locator.all.find(l => l.uuid === bone.rotation_pole_uuid);
+                               if (!pole) {
+                                       pole = new Locator({name: bone.name + '_pole'}).addTo(null_object).init();
+                                       pole.createUniqueName();
+                                       const axisIndex = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
+                                       const axisVec = axisIndex === 0 ? new THREE.Vector3(1,0,0) : axisIndex === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
+                                       const axisWorld = axisVec.clone().applyQuaternion(bone.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
+                                       const posWorld = bone.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
+                                       null_object.mesh.worldToLocal(posWorld);
+                                       pole.position.V3_set(posWorld);
+                                       pole.preview_controller.updateTransform(pole);
+                                       bone.rotation_pole_uuid = pole.uuid;
+                               }
+                               pole_locators[bone.uuid] = pole;
+                       }
+               });
+
                let base_rotations = {};
                bones.forEach(bone => {
                        if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
@@ -780,7 +800,37 @@ class NullObjectAnimator extends BoneAnimator {
                        bone_ref.bone.mesh.quaternion.copy(q_new);
                        bone_ref.bone.mesh.rotation.setFromQuaternion(q_new, 'ZYX');
                        bone_ref.bone.mesh.updateMatrixWorld();
-		});
+
+                       const pole = pole_locators[bone_ref.bone.uuid];
+                       if (pole) {
+                               const axis_world = (bone_ref.bone.rotation_hinge_axis === 0 ? new THREE.Vector3(1, 0, 0) : bone_ref.bone.rotation_hinge_axis === 1 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1)).applyQuaternion(bone_ref.bone.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
+                               const joint_pos = bone_ref.bone.mesh.getWorldPosition(new THREE.Vector3());
+                               const child_pos = bones[i + 1] ? bones[i + 1].mesh.getWorldPosition(new THREE.Vector3()) : null_object.getWorldCenter(false);
+                               const pole_pos = pole.getWorldCenter(false);
+                               const v_child = child_pos.sub(joint_pos);
+                               const v_pole = pole_pos.sub(joint_pos);
+                               const v_child_proj = v_child.clone().sub(axis_world.clone().multiplyScalar(axis_world.dot(v_child)));
+                               const v_pole_proj = v_pole.clone().sub(axis_world.clone().multiplyScalar(axis_world.dot(v_pole)));
+                               if (v_child_proj.lengthSq() > 1e-6 && v_pole_proj.lengthSq() > 1e-6) {
+                                       v_child_proj.normalize();
+                                       v_pole_proj.normalize();
+                                       const ang = Math.atan2(axis_world.dot(v_child_proj.clone().cross(v_pole_proj)), v_child_proj.dot(v_pole_proj));
+                                       const delta = new THREE.Quaternion().setFromAxisAngle(axis_world, ang);
+                                       bone_ref.bone.mesh.quaternion.premultiply(delta).normalize();
+                                       if (window.IKConstraints && bone_ref.bone.rotation_limit_enabled && bone_ref.bone.rotation_hinge_lock) {
+                                               const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
+                                               const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0) : keep === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1)).applyQuaternion(bone_ref.bone.rest_quaternion);
+                                               const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180, -180, -180];
+                                               const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180, 180, 180];
+                                               const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                               const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                                               bone_ref.bone.mesh.quaternion.copy(IKConstraints.clampHinge(bone_ref.bone.mesh.quaternion, axisLocal, min, max));
+                                       }
+                                       bone_ref.bone.mesh.rotation.setFromQuaternion(bone_ref.bone.mesh.quaternion, 'ZYX');
+                                       bone_ref.bone.mesh.updateMatrixWorld();
+                               }
+                       }
+               });
 
                if (target_original_quaternion) {
                        target.mesh.quaternion.copy(target_original_quaternion);
