@@ -150,6 +150,7 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
     new NodePreviewController(PoleVector, {
         setup(element) {
             const geometry = new THREE.ConeGeometry(0.3, 0.6, 8);
+            geometry.translate(0, -0.3, 0); // tip at origin
             const material = new THREE.MeshBasicMaterial({color: baseColor});
             const mesh = new THREE.Mesh(geometry, material);
             const lineGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -179,8 +180,14 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
                     const bone_pos = bone.mesh.getWorldPosition(new THREE.Vector3());
                     const rel = bone_pos.sub(pole_pos);
                     line.geometry.setFromPoints([rel, new THREE.Vector3(0, 0, 0)]);
+
+                    const dir = pole_pos.clone().sub(bone_pos).normalize();
+                    element.mesh.quaternion.setFromUnitVectors(
+                        new THREE.Vector3(0, 1, 0), dir
+                    );
                 } else {
                     line.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                    element.mesh.quaternion.identity();
                 }
             }
             if (Modes.animate && !this._runningPreview) {
