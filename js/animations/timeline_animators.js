@@ -701,21 +701,30 @@ class NullObjectAnimator extends BoneAnimator {
 			});
 		});
 
-		// Lower the distance threshold so the solver continues bending the chain even when the IK target is very close
-		this.chain.solveDistanceThreshold = 0;
-		this.solver.add(this.chain, ik_target, true);
-		this.solver.meshChains[0].forEach(mesh => { mesh.visible = false; });
+               // Lower the distance threshold so the solver continues bending the chain even when the IK target is very close
+               this.chain.solveDistanceThreshold = 0;
+               this.solver.add(this.chain, ik_target);
 
-		if (target_original_quaternion) {
-			base_rotations[target.uuid] = target.mesh.rotation.clone();
-		}
+               if (target_original_quaternion) {
+                       base_rotations[target.uuid] = target.mesh.rotation.clone();
+               }
 
-		this.solver.update();
-		let __posErr = 0;
-		{
-			const chain0 = this.solver.chains[0];
-			const last = chain0 ? chain0.bones[chain0.bones.length - 1] : null;
-			if (last) __posErr = new THREE.Vector3().copy(last.end).distanceTo(ik_target);
+               this.solver.update();
+
+               // Remove any debug meshes created by the solver to avoid leftover objects in the scene
+               this.solver.meshChains.forEach(chain => chain.forEach(mesh => {
+                       mesh.visible = false;
+                       if (mesh.parent) mesh.parent.remove(mesh);
+               }));
+               this.solver.targets.forEach(obj => {
+                       if (obj && obj.parent) obj.parent.remove(obj);
+               });
+
+               let __posErr = 0;
+               {
+                       const chain0 = this.solver.chains[0];
+                       const last = chain0 ? chain0.bones[chain0.bones.length - 1] : null;
+                       if (last) __posErr = new THREE.Vector3().copy(last.end).distanceTo(ik_target);
 		}
 
 		// METRICS: compute end-effector error in world space before clearing the solver
