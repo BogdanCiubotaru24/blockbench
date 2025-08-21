@@ -637,18 +637,18 @@ class NodePreviewController extends EventSystem {
 			mesh.scale.set(1, 1, 1);
 		}
 
-		if (Format.bone_rig) {
-			if (element.parent instanceof Group) {
-				element.parent.mesh.add(mesh);
-				mesh.position.x -= element.parent.origin[0]
-				mesh.position.y -= element.parent.origin[1]
-				mesh.position.z -= element.parent.origin[2]
-			} else if (mesh.parent !== Project.model_3d) {
-				Project.model_3d.add(mesh)
-			}
-		} else if (mesh.parent !== Project.model_3d) {
-			Project.model_3d.add(mesh)
-		}
+               if (Format.bone_rig) {
+                       if (element.parent instanceof Group || element.parent instanceof NullObject) {
+                               element.parent.mesh.add(mesh);
+                               mesh.position.x -= element.parent.origin[0]
+                               mesh.position.y -= element.parent.origin[1]
+                               mesh.position.z -= element.parent.origin[2]
+                       } else if (mesh.parent !== Project.model_3d) {
+                               Project.model_3d.add(mesh)
+                       }
+               } else if (mesh.parent !== Project.model_3d) {
+                       Project.model_3d.add(mesh)
+               }
 
 		mesh.updateMatrixWorld();
 
