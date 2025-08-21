@@ -70,16 +70,16 @@ class Property {
 		delete this.class.properties[this.name];
 	}
 	getDefault(instance) {
-		if (typeof this.default == 'function') {
-			return this.default(instance);
-		} else if (this.isArray) {
-			return this.default ? this.default.slice() : [];
-		} else if (this.isObject) {
-			return Object.keys(this.default).length ? JSON.parse(JSON.stringify(this.default)) : {};
-		} else {
-			return this.default;
-		}
-	}
+               if (typeof this.default == 'function') {
+                       return this.default(instance);
+               } else if (this.isArray || this.isVector) {
+                       return this.default ? this.default.slice() : [];
+               } else if (this.isObject) {
+                       return Object.keys(this.default).length ? JSON.parse(JSON.stringify(this.default)) : {};
+               } else {
+                       return this.default;
+               }
+       }
 	merge(instance, data) {
 		if (data[this.name] == undefined || !Condition(this.condition, instance)) return;
 
