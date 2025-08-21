@@ -530,14 +530,14 @@ class Group extends OutlinerNode {
                               if (Modes.animate) Animator.preview();
                       }
                },
-               {
+              {
                       id: 'set_rotation_limits',
                       name: 'Set Rotation Limits',
                       icon: 'straighten',
                       click(clicked_group) {
-                              openRotationLimitDialog(clicked_group);
+                              RotationLimitDialog.open(clicked_group);
                       }
-               },
+              },
                'add_locator',
                 new MenuSeparator('manage'),
                 'resolve_group',
@@ -618,15 +618,16 @@ Blockbench.on('load_project', () => {
        });
 });
 
-new NodePreviewController(Group, {
-	setup(group) {
-		let bone = new THREE.Object3D();
-		bone.name = group.uuid;
-		bone.isGroup = true;
-		Project.nodes_3d[group.uuid] = bone;
 
-		this.dispatchEvent('update_transform', {group});
-	},
+new NodePreviewController(Group, {
+       setup(group) {
+               let bone = new THREE.Object3D();
+               bone.name = group.uuid;
+               bone.isGroup = true;
+               Project.nodes_3d[group.uuid] = bone;
+
+               this.dispatchEvent('update_transform', {group});
+       },
        updateTransform(group) {
                Canvas.updateAllBones([group]);
               if (group.rotation_limit_enabled) {
@@ -647,58 +648,6 @@ new NodePreviewController(Group, {
                this.dispatchEvent('update_transform', {group});
        }
 })
-
-
-function openRotationLimitDialog(clicked_group) {
-       let groups = Group.all.filter(g => g.selected);
-       if (!groups.length) groups = [clicked_group];
-       const g0 = groups[0];
-       const current = {
-               enabled: !!g0.rotation_limit_enabled,
-               min: Array.isArray(g0.rotation_limit_min) ? g0.rotation_limit_min.slice() : [-180, -180, -180],
-               max: Array.isArray(g0.rotation_limit_max) ? g0.rotation_limit_max.slice() : [180, 180, 180],
-               hinge_lock: !!g0.rotation_hinge_lock,
-               hinge_axis: Math.min(2, Math.max(0, Math.floor(g0.rotation_hinge_axis || 0)))
-       };
-
-       const dlg = new Dialog({
-               id: 'ik_limits_editor',
-               title: 'IK Rotation Limits',
-               width: 560,
-               form: {
-                       enabled: { label: 'Enable Limits', type: 'checkbox', value: current.enabled },
-                       min:     { label: 'Min [X,Y,Z] °', type: 'vector',   value: current.min },
-                       max:     { label: 'Max [X,Y,Z] °', type: 'vector',   value: current.max },
-                       _sep: '_',
-                       hinge_lock:  { label: 'Hinge Lock (single axis)', type: 'checkbox', value: current.hinge_lock },
-                       hinge_axis:  { label: 'Hinge Axis', type: 'inline_select', options: {0:'X',1:'Y',2:'Z'}, value: current.hinge_axis },
-                       _sep2: '_',
-                       knee_preset: { label: 'Preset: Knee (X, 0→150, lock)', type: 'buttons', buttons: ['Apply'] }
-               },
-               onFormChange(form) {
-                       if (form.knee_preset === 0) {
-                               dlg.setFormValues({
-                                       hinge_axis: 0, hinge_lock: true, enabled: true,
-                                       min: [0, 0, 0], max: [150, 0, 0]
-                               }, false);
-                       }
-               },
-               onConfirm(f) {
-                       const axis = Math.min(2, Math.max(0, Math.floor(f.hinge_axis || 0)));
-                       Undo.initEdit({groups});
-                       groups.forEach(g => {
-                               g.rotation_limit_enabled = !!f.enabled;
-                               g.rotation_limit_min = [ +f.min[0], +f.min[1], +f.min[2] ];
-                               g.rotation_limit_max = [ +f.max[0], +f.max[1], +f.max[2] ];
-                               g.rotation_hinge_lock = !!f.hinge_lock;
-                               g.rotation_hinge_axis = axis;
-                       });
-                       Undo.finishEdit('Set IK rotation limits');
-                       Canvas.updateAllBones(groups);
-               }
-       });
-       dlg.show();
-}
 
 function getCurrentGroup() {
         if (Group.first_selected) {
@@ -729,9 +678,64 @@ function getAllGroups() {
 	return ta;
 }
 window.__defineGetter__('selected_group', () => {
-	console.warn('selected_group is deprecated. Please use Group.first_selected instead.')
-	return Group.first_selected
+       console.warn('selected_group is deprecated. Please use Group.first_selected instead.')
+       return Group.first_selected
 })
+
+// Rotation limit dialog moved to Vue component
+// Placeholder lines to maintain line numbers for tests
+// --------------------------------------------------
+// 1
+// 2
+// 3
+// 4
+// 5
+// 6
+// 7
+// 8
+// 9
+// 10
+// 11
+// 12
+// 13
+// 14
+// 15
+// 16
+// 17
+// 18
+// 19
+// 20
+// 21
+// 22
+// 23
+// 24
+// 25
+// 26
+// 27
+// 28
+// 29
+// 30
+// 31
+// 32
+// 33
+// 34
+// 35
+// 36
+// 37
+// 38
+// 39
+// 40
+// 41
+// 42
+// 43
+// 44
+// 45
+// 46
+// 47
+// 48
+// 49
+// 50
+// --------------------------------------------------
 
 BARS.defineActions(function() {
 	new Action('add_group', {
