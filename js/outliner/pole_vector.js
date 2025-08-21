@@ -70,6 +70,15 @@ class PoleVector extends OutlinerElement {
         return this;
     }
 }
+
+PoleVector.prototype.addTo = function(parent, index) {
+    OutlinerElement.prototype.addTo.call(this, parent, index);
+    const bone = Group.all.find(g => g.rotation_pole_uuid === this.uuid);
+    if (bone) {
+        bone.rotation_pole_parent_uuid = this.parent && this.parent.uuid;
+    }
+    return this;
+};
 PoleVector.prototype.title = 'Pole Vector';
 PoleVector.prototype.type = 'pole_vector';
 PoleVector.prototype.icon = 'fa-bullseye';
