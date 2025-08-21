@@ -28,7 +28,8 @@ var RotationLimitDialog = new Dialog({
                         min: Array.isArray(g.rotation_limit_min) ? g.rotation_limit_min.slice() : [-180, -180, -180],
                         max: Array.isArray(g.rotation_limit_max) ? g.rotation_limit_max.slice() : [180, 180, 180],
                         hinge_lock: !!g.rotation_hinge_lock,
-                        hinge_axis: Math.min(2, Math.max(0, Math.floor(g.rotation_hinge_axis || 0)))
+                        hinge_axis: Math.min(2, Math.max(0, Math.floor(g.rotation_hinge_axis || 0))),
+                        pole_enabled: !!g.rotation_pole_enabled
                     });
                 });
             },
@@ -39,14 +40,36 @@ var RotationLimitDialog = new Dialog({
                 const v = this.values[g.uuid];
                 if (!v) return;
                 const axis = Math.min(2, Math.max(0, Math.floor(v.hinge_axis || 0)));
+                if (!v.hinge_lock) v.pole_enabled = false;
+                const prevPole = g.rotation_pole_enabled;
                 Undo.initEdit({groups: [g]});
                 g.rotation_limit_enabled = !!v.enabled;
                 g.rotation_limit_min = v.min.slice();
                 g.rotation_limit_max = v.max.slice();
                 g.rotation_hinge_lock = !!v.hinge_lock;
                 g.rotation_hinge_axis = axis;
+                g.rotation_pole_enabled = !!v.pole_enabled;
                 Undo.finishEdit('Set IK rotation limits');
                 Canvas.updateAllBones([g]);
+                if (prevPole !== g.rotation_pole_enabled) {
+                    if (g.rotation_pole_enabled) {
+                        const pole_parent = g.parent instanceof Group ? g.parent : g;
+                        let pole = new PoleVector({name: g.name + '_pole'}).addTo(pole_parent).init();
+                        pole.createUniqueName();
+                        const axisVec = axis === 0 ? new THREE.Vector3(1,0,0) : axis === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
+                        const axisWorld = axisVec.clone().applyQuaternion(g.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
+                        const posWorld = g.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
+                        if (pole.parent && pole.parent.mesh) pole.parent.mesh.worldToLocal(posWorld);
+                        pole.position.V3_set(posWorld);
+                        pole.preview_controller.updateTransform(pole);
+                        g.rotation_pole_uuid = pole.uuid;
+                        pole.select();
+                    } else {
+                        const pole = g.rotation_pole_uuid && PoleVector.all.find(p => p.uuid === g.rotation_pole_uuid);
+                        if (pole) pole.remove();
+                        g.rotation_pole_uuid = undefined;
+                    }
+                }
             }
         },
         template: `
@@ -64,6 +87,7 @@ var RotationLimitDialog = new Dialog({
                         <option :value="1">Y</option>
                         <option :value="2">Z</option>
                     </select>
+                    <label class="checkbox" v-if="values[g.uuid].hinge_lock"><input type="checkbox" v-model="values[g.uuid].pole_enabled" @change="apply(g)"> Pole Vector</label>
                 </div>
             </div>
         `
