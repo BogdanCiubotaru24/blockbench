@@ -63,7 +63,7 @@ class PoleVector extends OutlinerElement {
         return pos;
     }
     init() {
-        if (this.parent instanceof Group == false) {
+        if (!(this.parent instanceof Group) && !(this.parent instanceof NullObject)) {
             this.addTo(Group.first_selected);
         }
         super.init();
