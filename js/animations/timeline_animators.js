@@ -945,14 +945,15 @@ class NullObjectAnimator extends BoneAnimator {
 }
 NullObjectAnimator.prototype.type = 'null_object';
 NullObjectAnimator.prototype.channels = {
-	position: { name: tl('timeline.position'), mutable: true, transform: true, max_data_points: 2 },
+        position: { name: tl('timeline.position'), mutable: true, transform: true, max_data_points: 2 },
 }
 NullObject.animator = NullObjectAnimator;
+PoleVector.animator = NullObjectAnimator;
 
 class EffectAnimator extends GeneralAnimator {
-	constructor(animation) {
-		super(null, animation);
-		this.last_displayed_time = 0;
+        constructor(animation) {
+                super(null, animation);
+                this.last_displayed_time = 0;
 
 		this.name = tl('timeline.effects')
 		this.selected = false;
