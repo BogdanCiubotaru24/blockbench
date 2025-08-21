@@ -210,3 +210,8 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
         }
     });
 })();
+
+PoleVector.on('moved', function() {
+    this._ik_moved = true;
+    Animator.preview();
+});
