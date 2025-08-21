@@ -690,6 +690,7 @@ class NullObjectAnimator extends BoneAnimator {
                                        pole.position.V3_set(posWorld);
                                        pole.preview_controller.updateTransform(pole);
                                        bone.rotation_pole_uuid = pole.uuid;
+                                       pole.select();
                                }
                                pole_locators[bone.uuid] = pole;
                        }

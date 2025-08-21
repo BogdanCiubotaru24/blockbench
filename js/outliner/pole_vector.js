@@ -59,6 +59,46 @@ PoleVector.prototype.buttons = [
 PoleVector.prototype.needsUniqueName = true;
 PoleVector.prototype.menu = new Menu([
     ...Outliner.control_menu_group,
+    new MenuSeparator('pole'),
+    {
+        id: 'hide_pole',
+        name: 'Hide Pole',
+        icon: 'fa-eye-slash',
+        click(clicked) {
+            const poles = PoleVector.selected.length ? PoleVector.selected.slice() : [clicked];
+            Undo.initEdit({elements: poles});
+            poles.forEach(p => {
+                p.visibility = false;
+                p.preview_controller.updateVisibility(p);
+            });
+            Undo.finishEdit('Hide pole vector');
+            if (Modes.animate && !this._runningPreview) {
+                this._runningPreview = true;
+                Animator.preview();
+                this._runningPreview = false;
+            }
+        }
+    },
+    {
+        id: 'reset_pole_to_joint',
+        name: 'Reset Pole to Joint',
+        icon: 'fa-undo',
+        click(clicked) {
+            const poles = PoleVector.selected.length ? PoleVector.selected.slice() : [clicked];
+            Undo.initEdit({elements: poles});
+            poles.forEach(p => {
+                const bone = Group.all.find(g => g.rotation_pole_uuid === p.uuid);
+                if (bone && bone.mesh) {
+                    const pos = bone.mesh.getWorldPosition(new THREE.Vector3());
+                    if (p.parent && p.parent.mesh) p.parent.mesh.worldToLocal(pos);
+                    p.position.V3_set(pos);
+                    p.preview_controller.updateTransform(p);
+                }
+            });
+            Undo.finishEdit('Reset pole vector');
+            if (Modes.animate) Animator.preview();
+        }
+    },
     new MenuSeparator('manage'),
     'rename',
     'toggle_visibility',
@@ -79,6 +119,14 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
             const geometry = new THREE.ConeGeometry(0.3, 0.6, 8);
             const material = new THREE.MeshBasicMaterial({color: baseColor});
             const mesh = new THREE.Mesh(geometry, material);
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(),
+                new THREE.Vector3()
+            ]);
+            const lineMaterial = new THREE.LineBasicMaterial({color: baseColor});
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            mesh.add(line);
+            mesh.line = line;
             Project.nodes_3d[element.uuid] = mesh;
             mesh.name = element.uuid;
             mesh.type = element.type;
@@ -90,13 +138,42 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
         },
         updateTransform(element) {
             NodePreviewController.prototype.updateTransform.call(this, element);
+            const line = element.mesh.line;
+            if (line) {
+                const bone = Group.all.find(g => g.rotation_pole_uuid === element.uuid);
+                if (bone && bone.mesh) {
+                    const pole_pos = element.mesh.getWorldPosition(new THREE.Vector3());
+                    const bone_pos = bone.mesh.getWorldPosition(new THREE.Vector3());
+                    const rel = bone_pos.sub(pole_pos);
+                    line.geometry.setFromPoints([rel, new THREE.Vector3(0, 0, 0)]);
+                } else {
+                    line.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                }
+            }
+            if (Modes.animate && !this._runningPreview) {
+                this._runningPreview = true;
+                Animator.preview();
+                this._runningPreview = false;
+            }
         },
         updateSelection(element) {
             let {mesh} = element;
-            mesh.material.color.set(element.selected ? gizmo_colors.outline : baseColor);
+            const color = element.selected ? gizmo_colors.outline : baseColor;
+            mesh.material.color.set(color);
             mesh.material.depthTest = !element.selected;
             mesh.renderOrder = element.selected ? 100 : 0;
+            if (mesh.line) {
+                mesh.line.material.color.set(color);
+                mesh.line.material.depthTest = !element.selected;
+                mesh.line.renderOrder = element.selected ? 100 : 0;
+            }
             this.dispatchEvent('update_selection', {element});
+        },
+        remove(element) {
+            if (element.mesh && element.mesh.line && element.mesh.line.geometry) {
+                element.mesh.line.geometry.dispose();
+            }
+            NodePreviewController.prototype.remove.call(this, element);
         }
     });
 })();
