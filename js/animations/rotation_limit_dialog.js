@@ -56,6 +56,7 @@ var RotationLimitDialog = new Dialog({
                         const pole_parent = g.parent instanceof Group ? g.parent : g;
                         let pole = new PoleVector({name: g.name + '_pole'}).addTo(pole_parent).init();
                         pole.createUniqueName();
+                        g.rotation_pole_parent_uuid = pole.parent.uuid;
                         const axisVec = axis === 0 ? new THREE.Vector3(1,0,0) : axis === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
                         const axisWorld = axisVec.clone().applyQuaternion(g.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
                         const posWorld = g.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
