@@ -85,7 +85,7 @@ class TwoBoneChain {
    * projecting the target onto the shoulder hinge plane. The resulting
    * angles are wrapped/clamped into their legal ranges.
    */
-  warmStart(target) {
+  warmStart(target, pole) {
     const L1 = this.L1, L2 = this.L2;
     const reach = L1 + L2;
     const r = Math.min(reach - 1e-5, Math.max(1e-5, target.length()));
@@ -117,6 +117,23 @@ class TwoBoneChain {
 
     this.q0.setFromAxisAngle(this.axis0, theta);
     this.q1.setFromAxisAngle(this.axis1, phi);
+
+    if (pole) {
+      const axis0 = this.axis0;
+      const pv = pole.clone().sub(this.root);
+      const pv_proj = pv.clone().sub(axis0.clone().multiplyScalar(axis0.dot(pv)));
+      const t_proj2 = target.clone().sub(axis0.clone().multiplyScalar(axis0.dot(target)));
+      const n_p = pv_proj.length();
+      const n_t2 = t_proj2.length();
+      if (n_p >= 1e-9 && n_t2 >= 1e-9) {
+        const a = t_proj2.clone().multiplyScalar(1 / n_t2);
+        const b = pv_proj.clone().multiplyScalar(1 / n_p);
+        const sin = axis0.clone().dot(a.clone().cross(b));
+        const cos = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+        const ang = Math.atan2(sin, cos);
+        this.q0.multiply(new THREE.Quaternion().setFromAxisAngle(axis0, ang));
+      }
+    }
 
     // Final strict clamp (no-op if already inside)
     if (this.joint0.type === 'ball') {
@@ -201,8 +218,8 @@ class TwoBoneChain {
     this.rotateJoint(0, target); // shoulder
   }
 
-  solve(target, { maxIters = 120, tol = 1e-2 } = {}) {
-    this.warmStart(target);
+  solve(target, { maxIters = 120, tol = 1e-2, pole = null } = {}) {
+    this.warmStart(target, pole);
     for (let i = 0; i < maxIters; i++) {
       this.iterate(target);
       const { p2 } = this.fk();
