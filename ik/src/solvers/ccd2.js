@@ -63,7 +63,7 @@ class TwoBoneChain {
 
     // Step tuning
     this.gain = 0.6;                   // damp each step to avoid overshoot near limits
-    this.maxStepRad = Math.PI / 10;    // max ~18 degrees per iteration
+    this.maxStepRad = Math.PI;         // allow up to 180 degrees per iteration
   }
 
   // Forward kinematics

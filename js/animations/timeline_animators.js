@@ -764,17 +764,6 @@ class NullObjectAnimator extends BoneAnimator {
                                        const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
                                        const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
 
-                                       // (Optional) small step cap about hinge axis to calm edges
-                                       const maxStep = Math.PI / 10; // ~18°
-                                       {
-                                               const axis = axisLocal;
-                                               const v = new THREE.Vector3(Reusable.quat1.x, Reusable.quat1.y, Reusable.quat1.z);
-                                               const signed = 2 * Math.atan2(v.dot(axis), Reusable.quat1.w);
-                                               const limited = THREE.MathUtils.clamp(signed, -maxStep, maxStep);
-                                               Reusable.quat1.setFromAxisAngle(axis, limited);
-                                               q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
-                                       }
-
                                        // Project ABSOLUTE local pose to hinge limits (like the harness)
                                        q_new = IKConstraints.clampHinge(q_new_unclamped, axisLocal, min, max);
                                } else {
