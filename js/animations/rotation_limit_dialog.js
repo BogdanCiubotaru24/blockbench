@@ -1,3 +1,5 @@
+const Vue = globalThis.Vue || require('vue');
+
 var RotationLimitDialog = new Dialog({
     id: 'ik_limits_editor',
     title: 'IK Rotation Limits',
@@ -64,8 +66,9 @@ var RotationLimitDialog = new Dialog({
 
 RotationLimitDialog.open = function(clicked_group) {
     let groups = Group.all.filter(g => g.selected);
-    if (!groups.length) groups = [clicked_group];
+    if (!groups.length && clicked_group) groups = [clicked_group];
+    if (!this.content_vue) this.build();
+    Vue.nextTick(() => this.content_vue.load(groups));
     this.show();
-    this.content_vue.load(groups);
 };
 
