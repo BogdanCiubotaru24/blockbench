@@ -93,8 +93,16 @@ PoleVector.prototype.menu = new Menu([
             const poles = PoleVector.selected.length ? PoleVector.selected.slice() : [clicked];
             Undo.initEdit({elements: poles});
             poles.forEach(p => {
+                const bone = Group.all.find(g => g.rotation_pole_uuid === p.uuid);
+                if (bone && bone.rotation_pole_enabled === false) return;
                 p.visibility = false;
                 p.preview_controller.updateVisibility(p);
+                if (bone) {
+                    bone.rotation_pole_enabled = false;
+                    if (!bone.rotation_hinge_lock) {
+                        bone.rotation_pole_uuid = undefined;
+                    }
+                }
             });
             Undo.finishEdit('Hide pole vector');
             if (Modes.animate && !this._runningPreview) {
@@ -113,7 +121,7 @@ PoleVector.prototype.menu = new Menu([
             Undo.initEdit({elements: poles});
             poles.forEach(p => {
                 const bone = Group.all.find(g => g.rotation_pole_uuid === p.uuid);
-                if (bone && bone.mesh) {
+                if (bone && bone.rotation_pole_enabled !== false && bone.mesh) {
                     const pos = bone.mesh.getWorldPosition(new THREE.Vector3());
                     if (p.parent && p.parent.mesh) p.parent.mesh.worldToLocal(pos);
                     p.position.V3_set(pos);

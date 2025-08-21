@@ -679,6 +679,7 @@ class NullObjectAnimator extends BoneAnimator {
                bones.forEach(bone => {
                        if (bone.rotation_hinge_lock && bone.rotation_pole_enabled) {
                                let pole = bone.rotation_pole_uuid && PoleVector.all.find(l => l.uuid === bone.rotation_pole_uuid);
+
                                if (!pole) {
                                        pole = new PoleVector({name: bone.name + '_pole'}).addTo(null_object).init();
                                        pole.createUniqueName();
@@ -691,8 +692,15 @@ class NullObjectAnimator extends BoneAnimator {
                                        pole.preview_controller.updateTransform(pole);
                                        bone.rotation_pole_uuid = pole.uuid;
                                        pole.select();
+                               } else {
+                                       pole.visibility = true;
+                                       pole.preview_controller.updateVisibility(pole);
                                }
                                pole_locators[bone.uuid] = pole;
+                       } else if (pole) {
+                               pole.visibility = false;
+                               pole.preview_controller.updateVisibility(pole);
+                               bone.rotation_pole_uuid = undefined;
                        }
                });
 
