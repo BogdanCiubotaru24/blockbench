@@ -144,6 +144,20 @@ PoleVector.prototype.menu = new Menu([
             if (Modes.animate) Animator.preview();
         }
     },
+    {
+        id: 'toggle_pole_auto_reset',
+        name: 'Auto Reset Pole',
+        icon: 'fa-sync',
+        click(clicked) {
+            const poles = PoleVector.selected.length ? PoleVector.selected.slice() : [clicked];
+            const bones = poles.map(p => Group.all.find(g => g.rotation_pole_uuid === p.uuid)).filter(Boolean);
+            if (!bones.length) return;
+            Undo.initEdit({groups: bones});
+            bones.forEach(b => b.rotation_pole_auto_reset = !b.rotation_pole_auto_reset);
+            Undo.finishEdit('Toggle pole auto reset');
+            if (Modes.animate) Animator.preview();
+        }
+    },
     new MenuSeparator('manage'),
     'rename',
     'toggle_visibility',

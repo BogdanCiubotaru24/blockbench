@@ -605,6 +605,7 @@ new Property(Group, 'vector', 'rotation_limit_max', {default() { return [180, 18
 new Property(Group, 'boolean', 'rotation_hinge_lock', {default: false});
 new Property(Group, 'number', 'rotation_hinge_axis', {default: 0});
 new Property(Group, 'boolean', 'rotation_pole_enabled', {default: false});
+new Property(Group, 'boolean', 'rotation_pole_auto_reset', {default: false});
 new Property(Group, 'string', 'rotation_pole_uuid');
 
 Blockbench.on('load_project', () => {
