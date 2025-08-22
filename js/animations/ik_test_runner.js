@@ -200,7 +200,12 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
               const start = targetNode.mesh.getWorldPosition(new THREE.Vector3());
               const dir = new THREE.Vector3(0, -1, 0)
                 .applyQuaternion(targetNode.mesh.getWorldQuaternion(new THREE.Quaternion()));
-              effPos = start.clone().add(dir);
+              const length =
+                targetNode.children?.find(ch => ch.mesh)
+                  ? targetNode.children.find(ch => ch.mesh)
+                      .mesh.getWorldPosition(new THREE.Vector3()).distanceTo(start)
+                  : (targetNode.rotation_distance || 1);
+              effPos = start.clone().add(dir.multiplyScalar(length));
             }
           }
         }
