@@ -1528,30 +1528,38 @@
 	
 						} else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'global') {
 
-                                                        let offset_vec = new THREE.Vector3();
-                                                        offset_vec[axis] = difference;
-                                                        const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
-                                                        offset_vec.divide(scale);            // neutralize parent scaling
+                                                       let offset_vec = new THREE.Vector3();
+                                                       offset_vec[axis] = difference;
+                                                       if (mesh.parent) {
+                                                               const parent_rot = new THREE.Matrix4();
+                                                               parent_rot.extractRotation(mesh.parent.matrixWorld);
+                                                               parent_rot.invert();
+                                                               offset_vec.applyMatrix4(parent_rot);
+                                                       }
+                                                       const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                       offset_vec.divide(scale);            // neutralize parent scaling
 
-                                                        var rotation = new THREE.Quaternion();
-                                                        mesh.parent.getWorldQuaternion(rotation);
-                                                        offset_vec.applyQuaternion(rotation.invert());
-				
-							scope.keyframes[0].offset('x', -offset_vec.x);
-							scope.keyframes[0].offset('y', offset_vec.y);
-							scope.keyframes[0].offset('z', offset_vec.z);
-	
-						} else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'local') {
+                                                       scope.keyframes[0].offset('x', -offset_vec.x);
+                                                       scope.keyframes[0].offset('y', offset_vec.y);
+                                                       scope.keyframes[0].offset('z', offset_vec.z);
 
-                                                        let offset_vec = new THREE.Vector3();
-                                                        offset_vec[axis] = difference;
-                                                        const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
-                                                        offset_vec.divide(scale);            // neutralize parent scaling
-                                                        offset_vec.applyQuaternion(mesh.quaternion);
+                                               } else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'local') {
 
-                                                        scope.keyframes[0].offset('x', -offset_vec.x);
-                                                        scope.keyframes[0].offset('y', offset_vec.y);
-                                                        scope.keyframes[0].offset('z', offset_vec.z);
+                                                       let offset_vec = new THREE.Vector3();
+                                                       offset_vec[axis] = difference;
+                                                       if (mesh.parent) {
+                                                               const parent_rot = new THREE.Matrix4();
+                                                               parent_rot.extractRotation(mesh.parent.matrixWorld);
+                                                               parent_rot.invert();
+                                                               offset_vec.applyMatrix4(parent_rot);
+                                                       }
+                                                       const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                       offset_vec.divide(scale);            // neutralize parent scaling
+                                                       offset_vec.applyQuaternion(mesh.quaternion);
+
+                                                       scope.keyframes[0].offset('x', -offset_vec.x);
+                                                       scope.keyframes[0].offset('y', offset_vec.y);
+                                                       scope.keyframes[0].offset('z', offset_vec.z);
 
                                                 } else if (Toolbox.selected.id === 'resize_tool' && axis == 'e') {
 

@@ -184,10 +184,6 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
         },
         updateTransform(element) {
             NodePreviewController.prototype.updateTransform.call(this, element);
-            if (element.parent?.mesh) {
-                const s = element.parent.mesh.scale;
-                element.mesh.position.divide(s);
-            }
             const line = element.mesh.line;
             if (line) {
                 const bone = Group.all.find(g => g.rotation_pole_uuid === element.uuid);
