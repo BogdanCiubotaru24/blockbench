@@ -707,12 +707,21 @@ class NullObjectAnimator extends BoneAnimator {
 				} else if (pole._ik_moved) {
 					pole.preview_controller.updateTransform(pole);
 					pole._ik_moved = false;
-				} else if (!pole.parent) {
-					const pole_parent = (
-						bone.rotation_pole_parent_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_parent_uuid)
-					) || bone.parent;
-					pole.addTo(pole_parent);
-				}
+                                } else if (!pole.parent) {
+                                        const pole_parent = (
+                                                bone.rotation_pole_parent_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_parent_uuid)
+                                        ) || bone.parent;
+                                        pole.addTo(pole_parent);
+                                }
+                                if (bone.rotation_pole_auto_reset && pole && bone.mesh) {
+                                        const pos = bone.mesh.getWorldPosition(new THREE.Vector3());
+                                        if (pole.parent && pole.parent.mesh) {
+                                                pole.parent.mesh.worldToLocal(pos);
+                                                pos.divide(pole.parent.mesh.scale);
+                                        }
+                                        pole.position.V3_set(pos);
+                                        pole.preview_controller.updateTransform(pole);
+                                }
                             pole.visibility = true;
                             pole.preview_controller.updateVisibility(pole);
                             pole_locators[bone.uuid] = pole;

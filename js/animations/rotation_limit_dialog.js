@@ -29,7 +29,8 @@ var RotationLimitDialog = new Dialog({
                         max: Array.isArray(g.rotation_limit_max) ? g.rotation_limit_max.slice() : [180, 180, 180],
                         hinge_lock: !!g.rotation_hinge_lock,
                         hinge_axis: Math.min(2, Math.max(0, Math.floor(g.rotation_hinge_axis || 0))),
-                        pole_enabled: !!g.rotation_pole_enabled
+                        pole_enabled: !!g.rotation_pole_enabled,
+                        pole_auto_reset: !!g.rotation_pole_auto_reset
                     });
                 });
             },
@@ -49,6 +50,7 @@ var RotationLimitDialog = new Dialog({
                 g.rotation_hinge_lock = !!v.hinge_lock;
                 g.rotation_hinge_axis = axis;
                 g.rotation_pole_enabled = !!v.pole_enabled;
+                g.rotation_pole_auto_reset = !!v.pole_auto_reset;
                 Undo.finishEdit('Set IK rotation limits');
                 Canvas.updateAllBones([g]);
                 if (prevPole !== g.rotation_pole_enabled) {
@@ -89,6 +91,7 @@ var RotationLimitDialog = new Dialog({
                         <option :value="2">Z</option>
                     </select>
                     <label class="checkbox" v-if="values[g.uuid].hinge_lock"><input type="checkbox" v-model="values[g.uuid].pole_enabled" @change="apply(g)"> Pole Vector</label>
+                    <label class="checkbox" v-if="values[g.uuid].pole_enabled"><input type="checkbox" v-model="values[g.uuid].pole_auto_reset" @change="apply(g)"> Auto Reset Pole</label>
                 </div>
             </div>
         `
