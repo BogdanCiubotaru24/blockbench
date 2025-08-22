@@ -1535,15 +1535,15 @@
 								const delta = new THREE.Vector3();
 								delta[axis] = difference;
 								const worldTarget = mesh.getWorldPosition(new THREE.Vector3()).add(delta);
-								const localTarget = mesh.parent
-									? mesh.parent.worldToLocal(worldTarget)
-									: worldTarget;
-								const offset_vec = localTarget.sub(mesh.position)
-									.divide(mesh.parent?.scale || new THREE.Vector3(1,1,1))
-									.multiplyScalar(canvasGridSize(event.shiftKey || Pressing.overrides.shift, event.ctrlOrCmd || Pressing.overrides.ctrl));
-								scope.keyframes[0].offset('x', -offset_vec.x);
-								scope.keyframes[0].offset('y',  offset_vec.y);
-								scope.keyframes[0].offset('z',  offset_vec.z);
+                                                                const localTarget = mesh.parent
+                                                                        ? mesh.parent.worldToLocal(worldTarget)
+                                                                        : worldTarget;
+                                                                const offset_vec = localTarget.sub(Reusable.vec3.fromArray(Outliner.selected[0].position))
+                                                                        .divide(mesh.parent?.scale || new THREE.Vector3(1,1,1))
+                                                                        .multiplyScalar(canvasGridSize(event.shiftKey || Pressing.overrides.shift, event.ctrlOrCmd || Pressing.overrides.ctrl));
+                                                                scope.keyframes[0].offset('x', -offset_vec.x);
+                                                                scope.keyframes[0].offset('y',  offset_vec.y);
+                                                                scope.keyframes[0].offset('z',  offset_vec.z);
 
 							 } else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'local') {
 
