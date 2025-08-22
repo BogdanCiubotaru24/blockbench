@@ -443,6 +443,9 @@ class Group extends OutlinerNode {
 		this.updateElement()
 	}
 }
+	Group.prototype.getUndoCopy = function() {
+	return this.getChildlessCopy(true);
+	};
 	Group.prototype.title = tl('data.group');
 	Group.prototype.type = 'group';
 	Group.prototype.icon = 'folder';
