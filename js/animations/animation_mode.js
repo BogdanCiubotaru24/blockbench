@@ -295,14 +295,14 @@ const Animator = {
 				}
 				let multiplier = animation.blend_weight ? Math.clamp(Animator.MolangParser.parse(animation.blend_weight), 0, Infinity) : 1;
 				if (typeof controller_blend_values[animation.uuid] == 'number') multiplier *= controller_blend_values[animation.uuid];
-				if (anim_i == animations.length - 1) {
-					let mesh = node.mesh;
-					if (!mesh.pre_rotation) mesh.pre_rotation = new THREE.Euler();
-					mesh.pre_rotation.copy(mesh.rotation);
-				}
-				animation.getBoneAnimator(node).displayFrame(multiplier);
-			})
-		})
+                                const mesh = node.mesh;
+                                if (anim_i === animations.length - 1 && mesh) {
+                                        if (!mesh.pre_rotation) mesh.pre_rotation = new THREE.Euler();
+                                        mesh.pre_rotation.copy(mesh.rotation);
+                                }
+                                animation.getBoneAnimator(node).displayFrame(multiplier);
+                        })
+                })
 
 		Animator.resetLastValues();
 		scene.updateMatrixWorld();
