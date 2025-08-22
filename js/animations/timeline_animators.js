@@ -675,6 +675,14 @@ class NullObjectAnimator extends BoneAnimator {
 		if (!bones.length) return;
 		bones.reverse();
 
+		bones.forEach(bone => {
+			if (bone.rest_quaternion) {
+				bone.mesh.quaternion.copy(bone.rest_quaternion);
+				bone.mesh.rotation.setFromQuaternion(bone.rest_quaternion, 'ZYX');
+				bone.mesh.updateMatrixWorld();
+			}
+		});
+
              let pole_locators = {};
              bones.forEach(bone => {
                      let pole = bone.rotation_pole_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_uuid);
@@ -825,10 +833,9 @@ class NullObjectAnimator extends BoneAnimator {
                                }
                        }
 
-                       // Write back LOCAL quaternion and sync Euler for UI
+// Write back LOCAL quaternion and update transforms
                        bone_ref.bone.mesh.quaternion.copy(q_new);
-                       bone_ref.bone.mesh.rotation.setFromQuaternion(q_new, 'ZYX');
-                       bone_ref.bone.mesh.updateMatrixWorld();
+			bone_ref.bone.mesh.updateMatrixWorld();
 
                        const pole = pole_locators[bone_ref.bone.uuid];
                        if (pole) {
@@ -855,8 +862,7 @@ class NullObjectAnimator extends BoneAnimator {
                                                const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
                                                bone_ref.bone.mesh.quaternion.copy(IKConstraints.clampHinge(bone_ref.bone.mesh.quaternion, axisLocal, min, max));
                                        }
-                                       bone_ref.bone.mesh.rotation.setFromQuaternion(bone_ref.bone.mesh.quaternion, 'ZYX');
-                                       bone_ref.bone.mesh.updateMatrixWorld();
+			bone_ref.bone.mesh.updateMatrixWorld();
                                }
                        }
                });
@@ -887,8 +893,7 @@ class NullObjectAnimator extends BoneAnimator {
                                        target.mesh.quaternion.copy(IKConstraints.clampBall(target.mesh.quaternion, axisLocal, swingX, swingY, twistMin, twistMax));
                                }
                        }
-                       target.mesh.rotation.setFromQuaternion(target.mesh.quaternion, 'ZYX');
-                       target.mesh.updateMatrixWorld();
+		target.mesh.updateMatrixWorld();
                }
 
 		let results = {};
