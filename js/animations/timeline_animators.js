@@ -723,14 +723,14 @@ class NullObjectAnimator extends BoneAnimator {
                     }
              });
 
-             // Cleanup unreferenced pole vectors
-             const used_poles = new Set(Object.values(pole_locators).map(p => p.uuid));
-             const parent_array = null_object.parent === 'root' ? Outliner.root : null_object.parent.children;
-             parent_array.slice().forEach(child => {
-                     if (child instanceof PoleVector && !used_poles.has(child.uuid) && !Group.all.find(g => g.rotation_pole_uuid === child.uuid)) {
-                             child.remove();
-                     }
-             });
+            // Cleanup unreferenced pole vectors
+            const used = new Set(Object.values(pole_locators).map(p => p.uuid));
+            PoleVector.all.slice().forEach(p => {
+                    if (!used.has(p.uuid) &&
+                        !Group.all.some(g => g.rotation_pole_uuid === p.uuid)) {
+                            p.remove();
+                    }
+            });
 
                let base_rotations = {};
                bones.forEach(bone => {
