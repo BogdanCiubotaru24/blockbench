@@ -167,17 +167,16 @@ class NullObject extends OutlinerElement {
 	
 			this.dispatchEvent('setup', {element});
 			this.dispatchEvent('update_selection', {element});
-		},
-		updateTransform(element) {
-			NodePreviewController.prototype.updateTransform.call(this, element);
-
-			element.mesh.fix_position.copy(element.mesh.position);
-
-			this.updateWindowSize(element);
-
-			this.dispatchEvent('update_transform', {element});
-		},
-		updateSelection(element) {
+},
+                updateTransform(element) {
+                        NodePreviewController.prototype.updateTransform.call(this, element);
+                        if (!Animator.open) {
+                                element.mesh.fix_position.copy(element.mesh.position);
+                        }
+                        this.updateWindowSize(element);
+                        this.dispatchEvent('update_transform', {element});
+                },
+                updateSelection(element) {
 			let {mesh} = element;
 	
 			mesh.material.color.set(element.selected ? gizmo_colors.outline : CustomTheme.data.colors.text);
