@@ -523,11 +523,12 @@ class Group extends OutlinerNode {
                               let value = !clicked_group.ik_enabled;
                               let affected = Group.all.filter(g => g.selected);
                               if (!affected.length) affected = [clicked_group];
-                              Undo.initEdit({elements: affected});
-                              affected.forEach(g => { g.ik_enabled = value; });
-                              Undo.finishEdit('Toggle IK mode');
-                              Canvas.updateAllBones(affected);
-                              if (Modes.animate) Animator.preview();
+				Undo.initEdit({elements: affected, keys: ['ik_enabled']});
+				affected.forEach(g => { g.ik_enabled = value; });
+				Undo.finishEdit('Toggle IK mode');
+				Outliner.vue.$forceUpdate();
+				Canvas.updateAllBones(affected);
+				if (Modes.animate) Animator.preview();
                       }
                },
               {
