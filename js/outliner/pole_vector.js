@@ -187,11 +187,13 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
                 if (bone && bone.mesh) {
                     const pole_pos = element.mesh.getWorldPosition(new THREE.Vector3());
                     const bone_pos = bone.mesh.getWorldPosition(new THREE.Vector3());
-                    const to_joint = bone_pos.clone().sub(pole_pos);
-                    line.geometry.setFromPoints([new THREE.Vector3(0, 0, 0), to_joint]);
+                    const joint_local = element.mesh.worldToLocal(bone_pos.clone());
+                    line.geometry.setFromPoints([new THREE.Vector3(), joint_local]);
 
-                    const dir = pole_pos.clone().sub(bone_pos).normalize();
-                    element.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                    const dir = bone_pos.clone().sub(pole_pos).normalize(); // pole→joint
+                    element.mesh.quaternion.setFromUnitVectors(
+                        new THREE.Vector3(0, -1, 0), dir
+                    );
                 } else {
                     line.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
                     element.mesh.quaternion.identity();
