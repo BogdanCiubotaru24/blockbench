@@ -1528,12 +1528,14 @@
 	
 						} else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'global') {
 
-							let offset_vec = new THREE.Vector3();
-							offset_vec[axis] = difference;
-				
-							var rotation = new THREE.Quaternion();
-							mesh.parent.getWorldQuaternion(rotation);
-							offset_vec.applyQuaternion(rotation.invert());
+                                                        let offset_vec = new THREE.Vector3();
+                                                        offset_vec[axis] = difference;
+                                                        const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                        offset_vec.divide(scale);            // neutralize parent scaling
+
+                                                        var rotation = new THREE.Quaternion();
+                                                        mesh.parent.getWorldQuaternion(rotation);
+                                                        offset_vec.applyQuaternion(rotation.invert());
 				
 							scope.keyframes[0].offset('x', -offset_vec.x);
 							scope.keyframes[0].offset('y', offset_vec.y);
@@ -1541,15 +1543,17 @@
 	
 						} else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'local') {
 
-							let offset_vec = new THREE.Vector3();
-							offset_vec[axis] = difference;
-							offset_vec.applyQuaternion(mesh.quaternion);
-				
-							scope.keyframes[0].offset('x', -offset_vec.x);
-							scope.keyframes[0].offset('y', offset_vec.y);
-							scope.keyframes[0].offset('z', offset_vec.z);
+                                                        let offset_vec = new THREE.Vector3();
+                                                        offset_vec[axis] = difference;
+                                                        const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                        offset_vec.divide(scale);            // neutralize parent scaling
+                                                        offset_vec.applyQuaternion(mesh.quaternion);
 
-						} else if (Toolbox.selected.id === 'resize_tool' && axis == 'e') {
+                                                        scope.keyframes[0].offset('x', -offset_vec.x);
+                                                        scope.keyframes[0].offset('y', offset_vec.y);
+                                                        scope.keyframes[0].offset('z', offset_vec.z);
+
+                                                } else if (Toolbox.selected.id === 'resize_tool' && axis == 'e') {
 
 							scope.keyframes[0].offset('x', difference);
 							if (!scope.keyframes[0].uniform) {
@@ -1557,15 +1561,19 @@
 								scope.keyframes[0].offset('z', difference);
 							}
 
-						} else {
-							if (axis == 'x' && Toolbox.selected.id === 'move_tool') {
-								difference *= -1
-							}
-							if (Toolbox.selected.id === 'resize_tool') {
-								scope.keyframes[0].uniform = false;	
-							}
-							scope.keyframes[0].offset(axis, difference);
-						}
+                                                } else {
+                                                        if (axis == 'x' && Toolbox.selected.id === 'move_tool') {
+                                                                difference *= -1
+                                                        }
+                                                        if (Toolbox.selected.id === 'move_tool' && ['x','y','z'].includes(axis)) {
+                                                                const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                                difference /= scale[axis];            // neutralize parent scaling
+                                                        }
+                                                        if (Toolbox.selected.id === 'resize_tool') {
+                                                                scope.keyframes[0].uniform = false;
+                                                        }
+                                                        scope.keyframes[0].offset(axis, difference);
+                                                }
 						scope.keyframes[0].select();
 							
 						displayDistance(value - originalValue);
