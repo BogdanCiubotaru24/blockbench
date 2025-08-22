@@ -244,7 +244,7 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
     });
 })();
 
-PoleVector.on('moved', function() {
-    this._ik_moved = true;
+PoleVector.preview_controller.on('update_transform', ({element}) => {
+    element._ik_moved = true;
     Animator.preview();
 });
