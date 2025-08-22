@@ -1528,21 +1528,17 @@
 	
 						} else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'global') {
 
-                                                       let offset_vec = new THREE.Vector3();
-                                                       offset_vec[axis] = difference;
-                                                       if (mesh.parent) {
-                                                               const parent_rot = new THREE.Matrix4();
-                                                               parent_rot.extractRotation(mesh.parent.matrixWorld);
-                                                               parent_rot.invert();
-                                                               offset_vec.applyMatrix4(parent_rot);
-                                                       }
-                                                      const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
-                                                      offset_vec.divide(scale);            // neutralize parent scaling
-                                                      offset_vec.multiplyScalar(canvasGridSize(event.shiftKey || Pressing.overrides.shift, event.ctrlOrCmd || Pressing.overrides.ctrl));
-
-                                                      scope.keyframes[0].offset('x', -offset_vec.x);
-                                                      scope.keyframes[0].offset('y', offset_vec.y);
-                                                      scope.keyframes[0].offset('z', offset_vec.z);
+                                                       const delta = new THREE.Vector3();
+                                                       delta[axis] = difference;          // world-axis delta
+                                                       const world = mesh.getWorldPosition(new THREE.Vector3()).add(delta);
+                                                       if (mesh.parent) world.applyMatrix4(mesh.parent.matrixWorldInverse);
+                                                       const offset_vec = world.sub(mesh.position);
+                                                       offset_vec.divide(mesh.parent?.scale || new THREE.Vector3(1,1,1));
+                                                       offset_vec.multiplyScalar(canvasGridSize(event.shiftKey || Pressing.overrides.shift,
+                                                       event.ctrlOrCmd || Pressing.overrides.ctrl));
+                                                       scope.keyframes[0].offset('x', -offset_vec.x);
+                                                       scope.keyframes[0].offset('y',  offset_vec.y);
+                                                       scope.keyframes[0].offset('z',  offset_vec.z);
 
                                                } else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'local') {
 
