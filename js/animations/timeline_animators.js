@@ -687,46 +687,30 @@ class NullObjectAnimator extends BoneAnimator {
                        bone.mesh.updateMatrixWorld();
                });
 
-             let pole_locators = {};
-             bones.forEach(bone => {
-                     let pole = bone.rotation_pole_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_uuid);
-                     if (!(pole instanceof PoleVector)) pole = undefined;
+            let pole_locators = {};
+            bones.forEach(bone => {
+                    let pole = bone.rotation_pole_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_uuid);
+                    if (!(pole instanceof PoleVector)) pole = undefined;
 
-                    if (bone.rotation_hinge_lock && bone.rotation_pole_enabled) {
-				if (!pole) {
-					const pole_parent = (
-						bone.rotation_pole_parent_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_parent_uuid)
-					) || bone.parent;
-                                       const prevSel = Outliner.selected.slice();
-                                       pole = new PoleVector({name: bone.name + '_pole'}).addTo(pole_parent).init();
-                                       pole.createUniqueName();
-                                       const axisIndex = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
-                                       const axisVec = axisIndex === 0 ? new THREE.Vector3(1,0,0) : axisIndex === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
-                                       const axisWorld = axisVec.clone().applyQuaternion(bone.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
-                                       const posWorld = bone.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
-                                       if (pole.parent && pole.parent.mesh) pole.parent.mesh.worldToLocal(posWorld);
-                                       pole.position.V3_set(posWorld);
-                                       pole.preview_controller.updateTransform(pole);
-                                       bone.rotation_pole_uuid = pole.uuid;
-                                       prevSel.forEach(el => el.select());
-                               } else if (pole._ik_moved) {
-                                       pole.preview_controller.updateTransform(pole);
-                                       pole._ik_moved = false;
-                               } else if (!pole.parent) {
-                                        const pole_parent = (
-                                                bone.rotation_pole_parent_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_parent_uuid)
-                                        ) || bone.parent;
-                                        pole.addTo(pole_parent);
-                                }
-                                if (bone.rotation_pole_auto_reset && pole && bone.mesh) {
-                                        const pos = bone.mesh.getWorldPosition(new THREE.Vector3());
-                                        if (pole.parent && pole.parent.mesh) {
-                                                pole.parent.mesh.worldToLocal(pos);
-                                                pos.divide(pole.parent.mesh.scale);
-                                        }
-                                        pole.position.V3_set(pos);
-                                        pole.preview_controller.updateTransform(pole);
-                                }
+                    if (bone.rotation_hinge_lock && bone.rotation_pole_enabled && pole) {
+                            if (pole._ik_moved) {
+                                    pole.preview_controller.updateTransform(pole);
+                                    pole._ik_moved = false;
+                            } else if (!pole.parent) {
+                                    const pole_parent = (
+                                            bone.rotation_pole_parent_uuid && Project.elements.findRecursive('uuid', bone.rotation_pole_parent_uuid)
+                                    ) || bone.parent;
+                                    pole.addTo(pole_parent);
+                            }
+                            if (bone.rotation_pole_auto_reset && bone.mesh) {
+                                    const pos = bone.mesh.getWorldPosition(new THREE.Vector3());
+                                    if (pole.parent && pole.parent.mesh) {
+                                            pole.parent.mesh.worldToLocal(pos);
+                                            pos.divide(pole.parent.mesh.scale);
+                                    }
+                                    pole.position.V3_set(pos);
+                                    pole.preview_controller.updateTransform(pole);
+                            }
                             pole.visibility = true;
                             pole.preview_controller.updateVisibility(pole);
                             pole_locators[bone.uuid] = pole;
@@ -735,7 +719,7 @@ class NullObjectAnimator extends BoneAnimator {
                             pole.preview_controller.updateVisibility(pole);
                             bone.rotation_pole_uuid = undefined;
                     }
-             });
+            });
 
             // Cleanup unreferenced pole vectors
             const used = new Set(Object.values(pole_locators).map(p => p.uuid));

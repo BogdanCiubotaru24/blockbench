@@ -71,6 +71,7 @@ var RotationLimitDialog = new Dialog({
                         const pole = g.rotation_pole_uuid && PoleVector.all.find(p => p.uuid === g.rotation_pole_uuid);
                         if (pole) pole.remove();
                         g.rotation_pole_uuid = undefined;
+                        g.rotation_pole_parent_uuid = undefined;
                     }
                 }
             }
