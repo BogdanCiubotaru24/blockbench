@@ -178,6 +178,9 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         const p = new THREE.Vector3(center.x + axis[ix], center.y + axis[iy], center.z + axis[iz]);
         setNullWorldPosition(nullObj, p);
 
+        Animator.showDefaultPose(true);
+        Animation.selected?.displayFrame(0);
+
         // yield every ~64 samples so dialog/buttons/status can update
         if ((done & 63) === 0) await yieldUI();
 
@@ -213,6 +216,9 @@ async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps 
         if (ok) pass++; else fail++;
         done++;
         if (onProgress && (done % Math.max(1, Math.floor(total/100)) === 0)) onProgress(done/total);
+
+        Animator.showDefaultPose(true);
+        Animation.selected?.displayFrame(0);
       }
     }
   }
