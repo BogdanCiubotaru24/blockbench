@@ -214,11 +214,13 @@ class BoneAnimator extends GeneralAnimator {
 		if (group_is_selected !== true && this.group) {
 			this.group.select();
 		}
-		Group.all.forEach(group => {
-			if (group.name == Group.first_selected.name && group != Group.first_selected) {
-				duplicates = true;
-			}
-		})
+               if (typeof Group !== 'undefined' && Group.all) {
+                       Group.all.forEach(group => {
+                               if (group.name == Group.first_selected.name && group != Group.first_selected) {
+                                       duplicates = true;
+                               }
+                       })
+               }
 		function iterate(arr) {
 			arr.forEach((it) => {
 				if (it.type === 'group' && !duplicates) {
@@ -637,8 +639,9 @@ class NullObjectAnimator extends BoneAnimator {
 		return this;
 	}
 	displayIK(get_samples) {
-		let null_object = this.getElement();
-		let target = [...Group.all, ...Locator.all].find(node => node.uuid == null_object.ik_target);
+               let null_object = this.getElement();
+               let groups = (typeof Group !== 'undefined' && Group.all) ? Group.all : [];
+               let target = [...groups, ...Locator.all].find(node => node.uuid == null_object.ik_target);
 		if (!null_object || !target) return;
 		if (target instanceof Group && !target.ik_enabled) return;
 
@@ -652,12 +655,12 @@ class NullObjectAnimator extends BoneAnimator {
                        target.rest_quaternion = target.mesh.quaternion.clone();
                }
 
-		let source;
-		if (null_object.ik_source) {
-			source = [...Group.all].find(node => node.uuid == null_object.ik_source);
-		} else {
-			source = null_object.parent;
-		}
+               let source;
+               if (null_object.ik_source) {
+                       source = [...groups].find(node => node.uuid == null_object.ik_source);
+               } else {
+                       source = null_object.parent;
+               }
 		if (!source) return;
 		if (!target.isChildOf(source) && source != 'root') return;
 
@@ -734,12 +737,12 @@ class NullObjectAnimator extends BoneAnimator {
 
             // Cleanup unreferenced pole vectors
             const used = new Set(Object.values(pole_locators).map(p => p.uuid));
-            PoleVector.all.slice().forEach(p => {
-                    if (!used.has(p.uuid) &&
-                        !Group.all.some(g => g.rotation_pole_uuid === p.uuid)) {
-                            p.remove();
-                    }
-            });
+           PoleVector.all.slice().forEach(p => {
+                   if (!used.has(p.uuid) &&
+                       !groups.some(g => g.rotation_pole_uuid === p.uuid)) {
+                           p.remove();
+                   }
+           });
 
                let base_rotations = {};
                bones.forEach(bone => {

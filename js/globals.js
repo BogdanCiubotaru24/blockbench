@@ -23,7 +23,7 @@ Blockbench.Keyframe = Keyframe;
 Blockbench.KeyframeDataPoint = KeyframeDataPoint;
 Blockbench.BoneAnimator = BoneAnimator;
 Blockbench.NullObjectAnimator = NullObjectAnimator;
-Blockbench.EffectAnimator = EffectAnimator;
+if (typeof EffectAnimator !== 'undefined') Blockbench.EffectAnimator = EffectAnimator;
 Blockbench.TimelineMarker = TimelineMarker;
 
 Blockbench.Panel = Panel;
