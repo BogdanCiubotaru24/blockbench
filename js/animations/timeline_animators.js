@@ -676,15 +676,16 @@ class NullObjectAnimator extends BoneAnimator {
 			bones.push(source);
 		}
 		if (!bones.length) return;
-		bones.reverse();
+               bones.reverse();
 
-		bones.forEach(bone => {
-			if (bone.rest_quaternion) {
-				bone.mesh.quaternion.copy(bone.rest_quaternion);
-				bone.mesh.rotation.setFromQuaternion(bone.rest_quaternion, 'ZYX');
-				bone.mesh.updateMatrixWorld();
-			}
-		});
+               bones.forEach(bone => {
+                       if (bone.mesh.fix_position) bone.mesh.position.copy(bone.mesh.fix_position);
+                       if (bone.rest_quaternion) {
+                               bone.mesh.quaternion.copy(bone.rest_quaternion);
+                               bone.mesh.rotation.setFromQuaternion(bone.rest_quaternion, 'ZYX');
+                       }
+                       bone.mesh.updateMatrixWorld();
+               });
 
              let pole_locators = {};
              bones.forEach(bone => {
