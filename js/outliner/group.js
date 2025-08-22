@@ -3,6 +3,7 @@ class Group extends OutlinerNode {
 	constructor(data, uuid) {
 		super(uuid)
 
+		this._ik_enabled = false;
 		for (var key in Group.properties) {
 			Group.properties[key].reset(this);
 		}

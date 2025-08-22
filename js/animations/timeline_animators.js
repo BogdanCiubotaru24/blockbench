@@ -987,13 +987,8 @@ Object.defineProperty(Group.prototype, 'ik_enabled', {
                 }
             });
         }
-        if (Modes.animate) Animator.preview();
+        Animator.preview();
     }
-});
-// ensure existing groups use the new property
-Group.all.forEach(g => {
-    g._ik_enabled = g.ik_enabled;
-    delete g.ik_enabled;
 });
 
 class EffectAnimator extends GeneralAnimator {
