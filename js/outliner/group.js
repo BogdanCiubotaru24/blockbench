@@ -547,22 +547,16 @@ class Group extends OutlinerNode {
                 'delete'
 	]);
 	Object.defineProperty(Group, 'all', {
-		get() {
-			return Project.groups || [];
-		},
-		set(arr) {
-			Project.groups.replace(arr);
-		}
+		get()	{ return (typeof Project !== 'undefined' && Project.groups)	|| []; },
+		set(a) { if (typeof Project !== 'undefined') Project.groups.replace(a); }
 	})
 	Object.defineProperty(Group, 'multi_selected', {
-		get() {
-			return Project.selected_groups || []
-		},
-		set(arr) {
-			if (arr instanceof Array == false) {
+		get()	{ return (typeof Project !== 'undefined' && Project.selected_groups) || [] },
+		set(a) {
+			if (a instanceof Array == false) {
 				console.warn('Not an array!')
 			}
-			Project.selected_groups.replace(arr)
+			if (typeof Project !== 'undefined') Project.selected_groups.replace(a)
 		}
 	})
 	Object.defineProperty(Group, 'selected', {
