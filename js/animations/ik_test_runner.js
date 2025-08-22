@@ -31,8 +31,8 @@
   }
 
   function estimateReach(nullObj) {
-    // Estimate IK chain reach by adding each bone's rest length once and the
-    // distance from the final bone end to the controller.
+    // Sum each bone's rest-space length and the distance from the effector
+    // (target) to the controller once.
     let approxReach = 0.0;
     try {
       const target = [...Group.all, ...Locator.all].find(n => n.uuid == nullObj.ik_target);
@@ -44,12 +44,13 @@
       if (nullObj.ik_source && source instanceof Group) bones.push(source);
       bones.reverse();
 
+      const vecFromArray = arr => new THREE.Vector3().fromArray(arr || [0,0,0]);
       // Sum rest-space distances from each bone origin to the end of the same bone
       for (let i = 0; i < bones.length; i++) {
-        const start = new THREE.Vector3().fromArray(bones[i].origin || [0,0,0]);
-        const end = new THREE.Vector3().fromArray(
-          (bones[i+1] ? bones[i+1].origin : (target.origin || [0,0,0]))
-        );
+        const start = vecFromArray(bones[i].origin);
+        const end = i + 1 < bones.length
+          ? vecFromArray(bones[i+1].origin)
+          : vecFromArray(target.origin || bones[i].origin);
         approxReach += start.distanceTo(end);
       }
 
@@ -87,7 +88,7 @@
 
   // ---------- GRID SWEEP (2D, existing) ----------
   function runGridSweep({ anim, nullObj, center, halfSpan = 0.6, steps = 21, okEps = 1e-2 }) {
-    // reach includes last bone end ➞ controller distance
+    // reach: sum of bone lengths plus target ➞ controller distance
     const reach = estimateReach(nullObj);
     const span = reach * halfSpan;
     const N = Math.max(3, steps|0);
@@ -151,7 +152,7 @@
 
   // ---------- NEW: CUBE SWEEP (3D, async & UI-friendly) ----------
 async function runCubeSweepAsync({ anim, nullObj, center, halfSpan = 0.6, steps = 11, okEps = 1e-2, onProgress }) {
-  // reach includes last bone end ➞ controller distance
+  // reach: sum of bone lengths plus target ➞ controller distance
   const reach = estimateReach(nullObj);
   const span = reach * halfSpan;
   let N = Math.max(3, steps|0);
