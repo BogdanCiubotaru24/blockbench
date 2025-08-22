@@ -1536,12 +1536,13 @@
                                                                parent_rot.invert();
                                                                offset_vec.applyMatrix4(parent_rot);
                                                        }
-                                                       const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
-                                                       offset_vec.divide(scale);            // neutralize parent scaling
+                                                      const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                      offset_vec.divide(scale);            // neutralize parent scaling
+                                                      offset_vec.multiplyScalar(canvasGridSize(event.shiftKey || Pressing.overrides.shift, event.ctrlOrCmd || Pressing.overrides.ctrl));
 
-                                                       scope.keyframes[0].offset('x', -offset_vec.x);
-                                                       scope.keyframes[0].offset('y', offset_vec.y);
-                                                       scope.keyframes[0].offset('z', offset_vec.z);
+                                                      scope.keyframes[0].offset('x', -offset_vec.x);
+                                                      scope.keyframes[0].offset('y', offset_vec.y);
+                                                      scope.keyframes[0].offset('z', offset_vec.z);
 
                                                } else if (Toolbox.selected.id === 'move_tool' && BarItems.transform_space.value === 'local') {
 
@@ -1553,13 +1554,14 @@
                                                                parent_rot.invert();
                                                                offset_vec.applyMatrix4(parent_rot);
                                                        }
-                                                       const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
-                                                       offset_vec.divide(scale);            // neutralize parent scaling
-                                                       offset_vec.applyQuaternion(mesh.quaternion);
+                                                      const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                      offset_vec.divide(scale);            // neutralize parent scaling
+                                                      offset_vec.applyQuaternion(mesh.quaternion);
+                                                      offset_vec.multiplyScalar(canvasGridSize(event.shiftKey || Pressing.overrides.shift, event.ctrlOrCmd || Pressing.overrides.ctrl));
 
-                                                       scope.keyframes[0].offset('x', -offset_vec.x);
-                                                       scope.keyframes[0].offset('y', offset_vec.y);
-                                                       scope.keyframes[0].offset('z', offset_vec.z);
+                                                      scope.keyframes[0].offset('x', -offset_vec.x);
+                                                      scope.keyframes[0].offset('y', offset_vec.y);
+                                                      scope.keyframes[0].offset('z', offset_vec.z);
 
                                                 } else if (Toolbox.selected.id === 'resize_tool' && axis == 'e') {
 
@@ -1573,10 +1575,11 @@
                                                         if (axis == 'x' && Toolbox.selected.id === 'move_tool') {
                                                                 difference *= -1
                                                         }
-                                                        if (Toolbox.selected.id === 'move_tool' && ['x','y','z'].includes(axis)) {
-                                                                const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
-                                                                difference /= scale[axis];            // neutralize parent scaling
-                                                        }
+                                                       if (Toolbox.selected.id === 'move_tool' && ['x','y','z'].includes(axis)) {
+                                                               const scale = mesh.parent?.scale || new THREE.Vector3(1,1,1);
+                                                               difference /= scale[axis];            // neutralize parent scaling
+                                                               difference *= canvasGridSize(event.shiftKey || Pressing.overrides.shift, event.ctrlOrCmd || Pressing.overrides.ctrl);
+                                                       }
                                                         if (Toolbox.selected.id === 'resize_tool') {
                                                                 scope.keyframes[0].uniform = false;
                                                         }
