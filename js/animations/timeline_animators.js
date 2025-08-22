@@ -971,6 +971,31 @@ NullObjectAnimator.prototype.channels = {
 NullObject.animator = NullObjectAnimator;
 PoleVector.animator = NullObjectAnimator;
 
+// Update IK chains when bones toggle IK mode
+Object.defineProperty(Group.prototype, 'ik_enabled', {
+    enumerable: true,
+    get() { return this._ik_enabled; },
+    set(value) {
+        const old = this._ik_enabled;
+        this._ik_enabled = value;
+        if (old === value) return;
+        if (!value) {
+            // Remove this bone from any null objects targeting it
+            NullObject.all.forEach(no => {
+                if (no.ik_target === this.uuid) {
+                    no.ik_target = undefined;
+                }
+            });
+        }
+        if (Modes.animate) Animator.preview();
+    }
+});
+// ensure existing groups use the new property
+Group.all.forEach(g => {
+    g._ik_enabled = g.ik_enabled;
+    delete g.ik_enabled;
+});
+
 class EffectAnimator extends GeneralAnimator {
         constructor(animation) {
                 super(null, animation);
