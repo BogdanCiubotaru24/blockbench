@@ -132,7 +132,10 @@ PoleVector.prototype.menu = new Menu([
                 const bone = Group.all.find(g => g.rotation_pole_uuid === p.uuid);
                 if (bone && bone.rotation_pole_enabled !== false && bone.mesh) {
                     const pos = bone.mesh.getWorldPosition(new THREE.Vector3());
-                    if (p.parent && p.parent.mesh) p.parent.mesh.worldToLocal(pos);
+                    if (p.parent && p.parent.mesh) {
+                        p.parent.mesh.worldToLocal(pos);
+                        pos.divide(p.parent.mesh.scale);
+                    }
                     p.position.V3_set(pos);
                     p.preview_controller.updateTransform(p);
                 }
@@ -181,6 +184,10 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
         },
         updateTransform(element) {
             NodePreviewController.prototype.updateTransform.call(this, element);
+            if (element.parent?.mesh) {
+                const s = element.parent.mesh.scale;
+                element.mesh.position.divide(s);
+            }
             const line = element.mesh.line;
             if (line) {
                 const bone = Group.all.find(g => g.rotation_pole_uuid === element.uuid);
