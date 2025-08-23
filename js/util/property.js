@@ -69,15 +69,15 @@ class Property {
 	delete() {
 		delete this.class.properties[this.name];
 	}
-	getDefault(instance) {
-               if (typeof this.default == 'function') {
-                       return this.default(instance);
-               } else if (this.isArray || this.isVector) {
-                       return this.default ? this.default.slice() : [];
+       getDefault(instance) {
+               let def = (typeof this.default == 'function') ? this.default(instance) : this.default;
+
+               if (this.isArray || this.isVector) {
+                       return def ? def.slice() : [];
                } else if (this.isObject) {
-                       return Object.keys(this.default).length ? JSON.parse(JSON.stringify(this.default)) : {};
+                       return def && Object.keys(def).length ? JSON.parse(JSON.stringify(def)) : {};
                } else {
-                       return this.default;
+                       return def;
                }
        }
 	merge(instance, data) {
