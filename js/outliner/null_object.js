@@ -260,16 +260,17 @@ BARS.defineActions(function() {
 					icon: node instanceof Locator ? 'fa-anchor' : 'folder',
 					marked: node.uuid == NullObject.selected[0].ik_target,
 					color: markerColors[node.color % markerColors.length]?.standard,
-					click() {
-						Undo.initEdit({elements: NullObject.selected});
-						NullObject.selected.forEach(null_object => {
-							null_object.ik_target = node.uuid;
-						})
-						Undo.finishEdit('Set IK target');
-					}
-				}
-			})
-		},
+                                        click() {
+                                                let affected = NullObject.selected.filter(null_object => null_object.ik_target != node.uuid);
+                                                Undo.initEdit({elements: affected});
+                                                affected.forEach(null_object => {
+                                                        null_object.ik_target = node.uuid;
+                                                })
+                                                Undo.finishEdit('Set IK target');
+                                        }
+                                }
+                        })
+                },
 		click(event) {
 			new Menu('set_ik_target', this.children(this), {searchable: true}).show(event.target, this);
 		}
@@ -301,16 +302,17 @@ BARS.defineActions(function() {
 					icon: node instanceof Locator ? 'fa-anchor' : 'folder',
 					marked: node.uuid == NullObject.selected[0].ik_source,
 					color: markerColors[node.color % markerColors.length]?.standard,
-					click() {
-						Undo.initEdit({elements: NullObject.selected});
-						NullObject.selected.forEach(null_object => {
-							null_object.ik_source = node.uuid;
-						})
-						Undo.finishEdit('Set IK source');
-					}
-				}
-			})
-		},
+                                        click() {
+                                                let affected = NullObject.selected.filter(null_object => null_object.ik_source != node.uuid);
+                                                Undo.initEdit({elements: affected});
+                                                affected.forEach(null_object => {
+                                                        null_object.ik_source = node.uuid;
+                                                })
+                                                Undo.finishEdit('Set IK source');
+                                        }
+                                }
+                        })
+                },
 		click(event) {
 			new Menu('set_ik_source', this.children(this), {searchable: true}).show(event.target, this);
 		}
@@ -346,20 +348,24 @@ BARS.defineActions(function() {
 					icon: node instanceof Locator ? 'fa-anchor' : 'folder',
 					marked: node.uuid == NullObject.selected[0].ik_pole,
 					color: markerColors[node.color % markerColors.length]?.standard,
-					click() {
-						Undo.initEdit({ elements: NullObject.selected });
-						NullObject.selected.forEach(null_object => {
-							if (null_object.ik_pole == node.uuid) {
-								null_object.ik_pole = undefined;
-							} else {
-								null_object.ik_pole = node.uuid;
-							}
-						});
-						Undo.finishEdit('Set IK pole');
-					}
-				}
-			})
-		},
+                                        click() {
+                                                let affected = NullObject.selected.filter(null_object => {
+                                                        let new_value = (null_object.ik_pole == node.uuid) ? undefined : node.uuid;
+                                                        return new_value != null_object.ik_pole;
+                                                });
+                                                Undo.initEdit({ elements: affected });
+                                                affected.forEach(null_object => {
+                                                        if (null_object.ik_pole == node.uuid) {
+                                                                null_object.ik_pole = undefined;
+                                                        } else {
+                                                                null_object.ik_pole = node.uuid;
+                                                        }
+                                                });
+                                                Undo.finishEdit('Set IK pole');
+                                        }
+                                }
+                        })
+                },
 		click(event) {
 			new Menu('set_ik_pole', this.children(this), { searchable: true }).show(event.target, this);
 		}
