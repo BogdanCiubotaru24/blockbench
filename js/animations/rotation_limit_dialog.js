@@ -30,7 +30,8 @@ var RotationLimitDialog = new Dialog({
                         hinge_lock: !!g.rotation_hinge_lock,
                         hinge_axis: Math.min(2, Math.max(0, Math.floor(g.rotation_hinge_axis || 0))),
                         pole_enabled: !!g.rotation_pole_enabled,
-                        pole_auto_reset: !!g.rotation_pole_auto_reset
+                        pole_auto_reset: !!g.rotation_pole_auto_reset,
+                        has_pole: !!g.rotation_pole_uuid
                     });
                 });
             },
@@ -42,7 +43,6 @@ var RotationLimitDialog = new Dialog({
                 if (!v) return;
                 const axis = Math.min(2, Math.max(0, Math.floor(v.hinge_axis || 0)));
                 if (!v.hinge_lock) v.pole_enabled = false;
-                const prevPole = g.rotation_pole_enabled;
                 Undo.initEdit({groups: [g]});
                 g.rotation_limit_enabled = !!v.enabled;
                 g.rotation_limit_min = v.min.slice();
@@ -53,27 +53,41 @@ var RotationLimitDialog = new Dialog({
                 g.rotation_pole_auto_reset = !!v.pole_auto_reset;
                 Undo.finishEdit('Set IK rotation limits');
                 Canvas.updateAllBones([g]);
-                if (prevPole !== g.rotation_pole_enabled) {
-                    if (g.rotation_pole_enabled) {
-                        const pole_parent = g.parent instanceof Group ? g.parent : g;
-                        let pole = new PoleVector({name: g.name + '_pole'}).addTo(pole_parent).init();
-                        pole.createUniqueName();
-                        g.rotation_pole_parent_uuid = pole.parent.uuid;
-                        const axisVec = axis === 0 ? new THREE.Vector3(1,0,0) : axis === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
-                        const axisWorld = axisVec.clone().applyQuaternion(g.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
-                        const posWorld = g.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
-                        if (pole.parent && pole.parent.mesh) pole.parent.mesh.worldToLocal(posWorld);
-                        pole.position.V3_set(posWorld);
-                        pole.preview_controller.updateTransform(pole);
-                        g.rotation_pole_uuid = pole.uuid;
-                        pole.select();
-                    } else {
-                        const pole = g.rotation_pole_uuid && PoleVector.all.find(p => p.uuid === g.rotation_pole_uuid);
-                        if (pole) pole.remove();
-                        g.rotation_pole_uuid = undefined;
-                        g.rotation_pole_parent_uuid = undefined;
-                    }
+                if (!g.rotation_pole_enabled && g.rotation_pole_uuid) {
+                    const pole = PoleVector.all.find(p => p.uuid === g.rotation_pole_uuid);
+                    if (pole) pole.remove();
+                    g.rotation_pole_uuid = undefined;
+                    g.rotation_pole_parent_uuid = undefined;
+                    this.$set(this.values[g.uuid], 'has_pole', false);
                 }
+            },
+            createPoleVector(g) {
+                const v = this.values[g.uuid];
+                if (!v) return;
+                if (!v.pole_enabled) {
+                    v.pole_enabled = true;
+                    this.apply(g);
+                }
+                if (g.rotation_pole_uuid) return;
+                const poles = [];
+                Undo.initEdit({elements: poles, groups: [g], outliner: true});
+                const pole_parent = g.parent instanceof Group ? g.parent : g;
+                let pole = new PoleVector({name: g.name + '_pole'}).addTo(pole_parent).init();
+                poles.push(pole);
+                pole.createUniqueName();
+                g.rotation_pole_parent_uuid = pole.parent.uuid;
+                const axis = Math.min(2, Math.max(0, Math.floor(v.hinge_axis || 0)));
+                const axisVec = axis === 0 ? new THREE.Vector3(1,0,0) : axis === 1 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
+                const axisWorld = axisVec.clone().applyQuaternion(g.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
+                const posWorld = g.mesh.getWorldPosition(new THREE.Vector3()).add(axisWorld.multiplyScalar(6));
+                if (pole.parent && pole.parent.mesh) pole.parent.mesh.worldToLocal(posWorld);
+                pole.position.V3_set(posWorld);
+                pole.preview_controller.updateTransform(pole);
+                g.rotation_pole_uuid = pole.uuid;
+                this.$set(this.values[g.uuid], 'has_pole', true);
+                Undo.finishEdit('Create pole vector');
+                Animator.preview();
+                pole.select();
             }
         },
         template: `
@@ -92,6 +106,7 @@ var RotationLimitDialog = new Dialog({
                         <option :value="2">Z</option>
                     </select>
                     <label class="checkbox" v-if="values[g.uuid].hinge_lock"><input type="checkbox" v-model="values[g.uuid].pole_enabled" @change="apply(g)"> Pole Vector</label>
+                    <button v-if="values[g.uuid].pole_enabled && !values[g.uuid].has_pole" @click="createPoleVector(g)">Create Pole Vector</button>
                     <label class="checkbox" v-if="values[g.uuid].pole_enabled"><input type="checkbox" v-model="values[g.uuid].pole_auto_reset" @change="apply(g)"> Auto Reset Pole</label>
                 </div>
             </div>
