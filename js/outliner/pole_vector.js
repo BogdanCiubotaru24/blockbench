@@ -216,7 +216,7 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
                     element.mesh.quaternion.identity();
                 }
             }
-            if (Modes.animate && !this._runningPreview) {
+            if (!this._runningPreview) {
                 this._runningPreview = true;
                 Animator.preview();
                 this._runningPreview = false;
@@ -243,8 +243,3 @@ OutlinerElement.registerType(PoleVector, 'pole_vector');
         }
     });
 })();
-
-PoleVector.preview_controller.on('update_transform', ({element}) => {
-    element._ik_moved = true;
-    Animator.preview();
-});
