@@ -599,8 +599,8 @@ new Property(Group, 'vector', 'skin_original_origin', {condition: {formats: ['sk
 new Property(Group, 'number', 'color');
 new Property(Group, 'boolean', 'ik_enabled', {default: false});
 new Property(Group, 'boolean', 'rotation_limit_enabled', {default: false});
-new Property(Group, 'vector', 'rotation_limit_min', {default() { return [-180, -180, -180]; }});
-new Property(Group, 'vector', 'rotation_limit_max', {default() { return [180, 180, 180]; }});
+new Property(Group, 'vector', 'rotation_limit_min', {default: () => [-180, -180, -180]});
+new Property(Group, 'vector', 'rotation_limit_max', {default: () => [180, 180, 180]});
 new Property(Group, 'boolean', 'rotation_hinge_lock', {default: false});
 new Property(Group, 'number', 'rotation_hinge_axis', {default: 0});
 new Property(Group, 'boolean', 'rotation_pole_enabled', {default: false});
