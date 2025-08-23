@@ -1919,6 +1919,8 @@
 	"action.graph_editor_include_other_graphs.desc": "Wähle, ob nicht ausgewählte Graphen für die Größe der Darstellung berücksichtigt werden",
 	"action.set_ik_source": "IK-Basis setzen",
 	"action.set_ik_source.desc": "Wähle den Basisknochen der Kette, die durch Inverse Kinematik gesteuert werden soll",
+	"action.set_ik_pole": "Set IK Pole",
+	"action.set_ik_pole.desc": "Select the pole that the chain will attempt to face towards while moving",
 	"edit.loop_cut.cuts": "Schnitte",
 	"panel.element.stretch": "Strecken",
 	"preview_scene.minecraft_plains": "Ebene",

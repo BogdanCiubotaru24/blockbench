@@ -1919,6 +1919,8 @@
 	"action.graph_editor_include_other_graphs.desc": "決定圖標編輯器是否包括視圖中未選中的圖表",
 	"action.set_ik_source": "設定IK根",
 	"action.set_ik_source.desc": "設定這個空對象能夠以反向運動學移動的鏈的根",
+	"action.set_ik_pole": "Set IK Pole",
+	"action.set_ik_pole.desc": "Select the pole that the chain will attempt to face towards while moving",
 	"edit.loop_cut.cuts": "切",
 	"panel.element.stretch": "Stretch",
 	"preview_scene.minecraft_plains": "Plains",

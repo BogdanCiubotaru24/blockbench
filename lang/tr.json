@@ -1919,6 +1919,8 @@
 	"action.graph_editor_include_other_graphs.desc": "Grafik düzenleyicinin görünümde seçili olmayan grafikleri içerip içermediği",
 	"action.set_ik_source": "IK Kökünü Ayarla",
 	"action.set_ik_source.desc": "Bu boş nesne tarafından Ters Kinematik aracılığıyla taşınması gereken zincirin kök kemiğini seçin",
+	"action.set_ik_pole": "Set IK Pole",
+	"action.set_ik_pole.desc": "Select the pole that the chain will attempt to face towards while moving",
 	"edit.loop_cut.cuts": "Kesikler",
 	"panel.element.stretch": "Uzat",
 	"preview_scene.minecraft_plains": "Ovalar",

@@ -1919,6 +1919,8 @@
 	"action.graph_editor_include_other_graphs.desc": "ビューで選択されていないグラフが含まれるか",
 	"action.set_ik_source": "IK ルートをセット",
 	"action.set_ik_source.desc": "オブジェクトが移動する際に使用するルートボーンを選択します",
+	"action.set_ik_pole": "Set IK Pole",
+	"action.set_ik_pole.desc": "Select the pole that the chain will attempt to face towards while moving",
 	"edit.loop_cut.cuts": "カット",
 	"panel.element.stretch": "Stretch",
 	"preview_scene.minecraft_plains": "平原",

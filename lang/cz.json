@@ -1919,6 +1919,8 @@
 	"action.graph_editor_include_other_graphs.desc": "Whether the graph editor includes the graphs that are not selected in the view",
 	"action.set_ik_source": "Set IK Root",
 	"action.set_ik_source.desc": "Select the root bone of the chain that should be moved by this null object via Inverse Kinematics",
+	"action.set_ik_pole": "Set IK Pole",
+	"action.set_ik_pole.desc": "Select the pole that the chain will attempt to face towards while moving",
 	"edit.loop_cut.cuts": "Cuts",
 	"panel.element.stretch": "Stretch",
 	"preview_scene.minecraft_plains": "Plains",
