@@ -8,27 +8,31 @@
 'use strict';
 
 
-       function applyBoneRotationLimits(bone) {
-               if (!bone || !window.IKConstraints || !bone.rotation_limit_enabled) return;
+       function clampBoneQuaternion(bone, q) {
+               if (!bone || !window.IKConstraints || !bone.rotation_limit_enabled) return q;
                const keep = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
                const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0)
                        : keep === 1 ? new THREE.Vector3(0,1,0)
                        : new THREE.Vector3(0,0,1)).applyQuaternion(bone.rest_quaternion || new THREE.Quaternion());
                const minArr = Array.isArray(bone.rotation_limit_min) ? bone.rotation_limit_min : [-180, -180, -180];
                const maxArr = Array.isArray(bone.rotation_limit_max) ? bone.rotation_limit_max : [180, 180, 180];
-               let q = bone.mesh.quaternion.clone();
                if (bone.rotation_hinge_lock) {
                        const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
                        const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                       q = IKConstraints.clampHinge(q, axisLocal, min, max);
+                       return IKConstraints.clampHinge(q, axisLocal, min, max);
                } else {
                        const other = [0,1,2].filter(i => i !== keep);
                        const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
                        const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
                        const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
                        const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                       q = IKConstraints.clampBall(q, axisLocal, swingX, swingY, twistMin, twistMax);
+                       return IKConstraints.clampBall(q, axisLocal, swingX, swingY, twistMin, twistMax);
                }
+       }
+
+       function applyBoneRotationLimits(bone) {
+               if (!bone) return;
+               let q = clampBoneQuaternion(bone, bone.mesh.quaternion.clone());
                bone.mesh.quaternion.copy(q);
                bone.mesh.rotation.setFromQuaternion(bone.mesh.quaternion);
                bone.mesh.updateMatrix();
@@ -1548,9 +1552,13 @@
 								rotWorldMatrix.premultiply(inverse)
 							}
 
+                                                       let q = new THREE.Quaternion().setFromRotationMatrix(rotWorldMatrix);
+                                                       q = clampBoneQuaternion(Group.first_selected, q);
+                                                       rotWorldMatrix.makeRotationFromQuaternion(q);
                                                        mesh.matrix.copy(rotWorldMatrix)
                                                        mesh.setRotationFromMatrix(rotWorldMatrix)
-                                                       applyBoneRotationLimits(Group.first_selected)
+                                                       mesh.updateMatrix();
+                                                       mesh.updateMatrixWorld();
                                                        let e = mesh.rotation;
 
 							scope.keyframes[0].offset('x', Math.trimDeg( (-Math.radToDeg(e.x - old_rotation.x)) - scope.keyframes[0].calc('x') ));
@@ -1566,7 +1574,11 @@
 							var obj_val = Math.trimDeg(Math.radToDeg(mesh.rotation[axis]) + difference);
 							mesh.rotation[axis] = Math.degToRad(obj_val);
                                                        mesh.rotation.reorder(old_order);
-                                                       applyBoneRotationLimits(Group.first_selected)
+                                                       let q = clampBoneQuaternion(Group.first_selected, mesh.quaternion.clone());
+                                                       mesh.quaternion.copy(q);
+                                                       mesh.rotation.setFromQuaternion(mesh.quaternion);
+                                                       mesh.updateMatrix();
+                                                       mesh.updateMatrixWorld();
 
                                                        scope.keyframes[0].offset('x', Math.trimDeg( (-Math.radToDeg(mesh.rotation.x - old_rotation.x)) - scope.keyframes[0].calc('x') ));
 							scope.keyframes[0].offset('y', Math.trimDeg( (-Math.radToDeg(mesh.rotation.y - old_rotation.y)) - scope.keyframes[0].calc('y') ));
