@@ -650,9 +650,28 @@ class NodePreviewController extends EventSystem {
                        Project.model_3d.add(mesh)
                }
 
-		mesh.updateMatrixWorld();
+mesh.updateMatrixWorld();
 
-		this.dispatchEvent('update_transform', {element});
+if (element.rotation_limit_helper) {
+mesh.matrixWorld.decompose(
+element.rotation_limit_helper.position,
+element.rotation_limit_helper.quaternion,
+element.rotation_limit_helper.scale
+);
+element.rotation_limit_helper.visible = element.selected && element.rotation_limit_enabled;
+['x', 'y', 'z'].forEach((axis, i) => {
+const arc = element.rotation_limit_helper[axis];
+if (arc && arc.material) {
+const rot = element.rotation[i];
+const min = element.rotation_limit_min[i];
+const max = element.rotation_limit_max[i];
+const exceeded = rot < min || rot > max;
+arc.material.color.setHex(exceeded ? 0xff0000 : 0x00ff00);
+}
+});
+}
+
+this.dispatchEvent('update_transform', {element});
 	}
 	updateVisibility(element) {
 		element.mesh.visible = element.visibility;
