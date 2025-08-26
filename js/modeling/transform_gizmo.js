@@ -5,10 +5,49 @@
 
  ( function () {
 
-	'use strict';
+'use strict';
 
 
-	class GizmoMaterial extends THREE.MeshBasicMaterial {
+       function applyBoneRotationLimits(bone) {
+               if (!bone || !window.IKConstraints || !bone.rotation_limit_enabled) return;
+               const keep = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
+               const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0)
+                       : keep === 1 ? new THREE.Vector3(0,1,0)
+                       : new THREE.Vector3(0,0,1)).applyQuaternion(bone.rest_quaternion || new THREE.Quaternion());
+               const minArr = Array.isArray(bone.rotation_limit_min) ? bone.rotation_limit_min : [-180, -180, -180];
+               const maxArr = Array.isArray(bone.rotation_limit_max) ? bone.rotation_limit_max : [180, 180, 180];
+               let q = bone.mesh.quaternion.clone();
+               if (bone.rotation_hinge_lock) {
+                       const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                       const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                       q = IKConstraints.clampHinge(q, axisLocal, min, max);
+               } else {
+                       const other = [0,1,2].filter(i => i !== keep);
+                       const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
+                       const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
+                       const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                       const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                       q = IKConstraints.clampBall(q, axisLocal, swingX, swingY, twistMin, twistMax);
+               }
+               bone.mesh.quaternion.copy(q);
+               bone.mesh.rotation.setFromQuaternion(bone.mesh.quaternion);
+               bone.mesh.updateMatrix();
+               bone.mesh.updateMatrixWorld();
+       }
+
+       function applyRotationLimitsToSelection() {
+               if (!Format || !Format.bone_rig) return;
+               let objects = getRotationObjects();
+               if (!objects) return;
+               if (objects instanceof Array == false) objects = [objects];
+               objects.forEach(obj => {
+                       if (obj instanceof Group) {
+                               applyBoneRotationLimits(obj);
+                       }
+               });
+       }
+
+       class GizmoMaterial extends THREE.MeshBasicMaterial {
 		constructor(parameters) {
 			super()
 
@@ -1386,8 +1425,9 @@
 							if (axisNumber == undefined) {
 								axisNumber = rotate_normal;
 							}
-							rotateOnAxis(n => (n + difference), axisNumber)
-							Canvas.updatePositions(true)
+                                                       rotateOnAxis(n => (n + difference), axisNumber)
+                                                       applyRotationLimitsToSelection()
+                                                       Canvas.updatePositions(true)
 							scope.updateSelection()
 							displayDistance(angle - originalValue);
 							previousValue = angle
@@ -1508,9 +1548,10 @@
 								rotWorldMatrix.premultiply(inverse)
 							}
 
-							mesh.matrix.copy(rotWorldMatrix)
-							mesh.setRotationFromMatrix(rotWorldMatrix)
-							let e = mesh.rotation;
+                                                       mesh.matrix.copy(rotWorldMatrix)
+                                                       mesh.setRotationFromMatrix(rotWorldMatrix)
+                                                       applyBoneRotationLimits(Group.first_selected)
+                                                       let e = mesh.rotation;
 
 							scope.keyframes[0].offset('x', Math.trimDeg( (-Math.radToDeg(e.x - old_rotation.x)) - scope.keyframes[0].calc('x') ));
 							scope.keyframes[0].offset('y', Math.trimDeg( (-Math.radToDeg(e.y - old_rotation.y)) - scope.keyframes[0].calc('y') ));
@@ -1524,9 +1565,10 @@
 							mesh.rotation.reorder(axisNumber == 0 ? 'ZYX' : (axisNumber == 1 ? 'ZXY' : 'XYZ'))
 							var obj_val = Math.trimDeg(Math.radToDeg(mesh.rotation[axis]) + difference);
 							mesh.rotation[axis] = Math.degToRad(obj_val);
-							mesh.rotation.reorder(old_order);
-				
-							scope.keyframes[0].offset('x', Math.trimDeg( (-Math.radToDeg(mesh.rotation.x - old_rotation.x)) - scope.keyframes[0].calc('x') ));
+                                                       mesh.rotation.reorder(old_order);
+                                                       applyBoneRotationLimits(Group.first_selected)
+
+                                                       scope.keyframes[0].offset('x', Math.trimDeg( (-Math.radToDeg(mesh.rotation.x - old_rotation.x)) - scope.keyframes[0].calc('x') ));
 							scope.keyframes[0].offset('y', Math.trimDeg( (-Math.radToDeg(mesh.rotation.y - old_rotation.y)) - scope.keyframes[0].calc('y') ));
 							scope.keyframes[0].offset('z', Math.trimDeg( ( Math.radToDeg(mesh.rotation.z - old_rotation.z)) - scope.keyframes[0].calc('z') ));
 	
