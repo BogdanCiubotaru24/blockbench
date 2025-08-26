@@ -635,21 +635,35 @@ new NodePreviewController(Group, {
        },
        updateTransform(group) {
                Canvas.updateAllBones([group]);
-              if (group.rotation_limit_enabled) {
-                       if (!group.rotation_limit_helper) {
-                               let geometry = new THREE.BufferGeometry().setFromPoints([
-                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0.5,0,0),
-                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0,0.5,0),
-                                       new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0.5),
-                               ]);
-                               let material = new THREE.LineBasicMaterial({color: 0xff0000});
-                               group.rotation_limit_helper = new THREE.LineSegments(geometry, material);
-                               group.mesh.add(group.rotation_limit_helper);
-                       }
-                       group.rotation_limit_helper.visible = true;
-              } else if (group.rotation_limit_helper) {
+               if (group.rotation_limit_enabled) {
+if (!group.rotation_limit_helper) {
+group.rotation_limit_helper = new THREE.Object3D();
+Project.model_3d.add(group.rotation_limit_helper);
+}
+while (group.rotation_limit_helper.children.length) {
+let child = group.rotation_limit_helper.children.pop();
+if (child.geometry) child.geometry.dispose();
+if (child.material) child.material.dispose();
+}
+['x', 'y', 'z'].forEach((axis, i) => {
+const min = group.rotation_limit_min[i];
+const max = group.rotation_limit_max[i];
+if (min !== -180 || max !== 180) {
+let start = Math.degToRad(min);
+let length = Math.degToRad(max - min);
+if (length <= 0) length += Math.PI * 2;
+let geometry = new THREE.RingGeometry(0.9, 1, 32, 1, start, length);
+if (axis === 'x') geometry.rotateY(Math.PI / 2);
+else if (axis === 'y') geometry.rotateX(Math.PI / 2);
+let material = new THREE.MeshBasicMaterial({color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.25});
+let mesh = new THREE.Mesh(geometry, material);
+group.rotation_limit_helper.add(mesh);
+group.rotation_limit_helper[axis] = mesh;
+}
+});
+               } else if (group.rotation_limit_helper) {
                        group.rotation_limit_helper.visible = false;
-              }
+               }
                this.dispatchEvent('update_transform', {group});
        }
 })
