@@ -700,9 +700,26 @@ class NullObjectAnimator extends BoneAnimator {
                                 .normalize();
 
                         Reusable.quat1.setFromUnitVectors(
-                                bone_ref.last_diff,
-                                end,
-                        );
+			bone_ref.last_diff,
+			end,
+			);
+		if (bone_ref.constraint && bone_ref.constraint.type === 'hinge') {
+			const axis = bone_ref.constraint.axis;
+			const cur = bone_ref.last_diff.clone();
+			const tgt = end.clone();
+			const cur_proj = cur.sub(axis.clone().multiplyScalar(axis.dot(cur))).normalize();
+			const tgt_proj = tgt.sub(axis.clone().multiplyScalar(axis.dot(tgt))).normalize();
+			const ncp = cur_proj.lengthSq();
+			const ntp = tgt_proj.lengthSq();
+			if (ncp > 1e-9 && ntp > 1e-9) {
+				const sin = axis.clone().dot(cur_proj.clone().cross(tgt_proj));
+				const cos = THREE.MathUtils.clamp(cur_proj.dot(tgt_proj), -1, 1);
+				const ang = Math.atan2(sin, cos);
+				Reusable.quat1.setFromAxisAngle(axis, ang);
+			} else {
+				Reusable.quat1.identity();
+			}
+		}
 
                         const q_local = bone_ref.bone.mesh.quaternion;
                         let q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
