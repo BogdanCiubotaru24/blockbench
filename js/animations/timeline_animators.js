@@ -652,6 +652,30 @@ class NullObjectAnimator extends BoneAnimator {
 
                 let __posErr = bone_pos[bone_pos.length - 1].distanceTo(ik_target);
 
+                function clampQuaternion(bone, q) {
+                        if (window.IKConstraints && bone.rotation_limit_enabled) {
+                                const keep = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
+                                const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0)
+                                        : keep === 1 ? new THREE.Vector3(0,1,0)
+                                        : new THREE.Vector3(0,0,1)).applyQuaternion(bone.rest_quaternion || new THREE.Quaternion());
+                                const minArr = Array.isArray(bone.rotation_limit_min) ? bone.rotation_limit_min : [-180, -180, -180];
+                                const maxArr = Array.isArray(bone.rotation_limit_max) ? bone.rotation_limit_max : [180, 180, 180];
+                                if (bone.rotation_hinge_lock) {
+                                        const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                        const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                                        return IKConstraints.clampHinge(q, axisLocal, min, max);
+                                } else {
+                                        const other = [0,1,2].filter(idx => idx !== keep);
+                                        const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
+                                        const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
+                                        const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
+                                        const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
+                                        return IKConstraints.clampBall(q, axisLocal, swingX, swingY, twistMin, twistMax);
+                                }
+                        }
+                        return q;
+                }
+
                 let results = {};
                 for (i = 0; i < bone_references.length; i++) {
                         let bone_ref = bone_references[i];
@@ -669,30 +693,23 @@ class NullObjectAnimator extends BoneAnimator {
 
                         const q_local = bone_ref.bone.mesh.quaternion;
                         let q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
-                        let q_new = q_new_unclamped;
-                        if (window.IKConstraints && bone_ref.bone.rotation_limit_enabled) {
-                                const keep = Math.min(2, Math.max(0, Math.floor(bone_ref.bone.rotation_hinge_axis || 0)));
-                                const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0)
-                                        : keep === 1 ? new THREE.Vector3(0,1,0)
-                                        : new THREE.Vector3(0,0,1)).applyQuaternion(bone_ref.bone.rest_quaternion || new THREE.Quaternion());
-                                const minArr = Array.isArray(bone_ref.bone.rotation_limit_min) ? bone_ref.bone.rotation_limit_min : [-180, -180, -180];
-                                const maxArr = Array.isArray(bone_ref.bone.rotation_limit_max) ? bone_ref.bone.rotation_limit_max : [180, 180, 180];
-                                if (bone_ref.bone.rotation_hinge_lock) {
-                                        const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
-                                        const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                                        q_new = IKConstraints.clampHinge(q_new_unclamped, axisLocal, min, max);
-                                } else {
-                                        const other = [0,1,2].filter(idx => idx !== keep);
-                                        const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
-                                        const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
-                                        const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
-                                        const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                                        q_new = IKConstraints.clampBall(q_new_unclamped, axisLocal, swingX, swingY, twistMin, twistMax);
-                                }
-                        }
+                        let q_new = clampQuaternion(bone_ref.bone, q_new_unclamped.clone());
 
                         bone_ref.bone.mesh.quaternion.copy(q_new);
                         bone_ref.bone.mesh.updateMatrixWorld();
+
+                        let q_diff = q_new_unclamped.clone().multiply(q_new.clone().invert());
+                        if (Math.abs(q_diff.x) > 1e-5 || Math.abs(q_diff.y) > 1e-5 || Math.abs(q_diff.z) > 1e-5 || Math.abs(1 - q_diff.w) > 1e-5) {
+                                for (let j = i - 1; j >= 0; j--) {
+                                        let parent = bone_references[j].bone;
+                                        let q_parent_unclamped = parent.mesh.quaternion.clone().multiply(q_diff).normalize();
+                                        let q_parent = clampQuaternion(parent, q_parent_unclamped.clone());
+                                        parent.mesh.quaternion.copy(q_parent);
+                                        parent.mesh.updateMatrixWorld();
+                                        q_diff = q_parent_unclamped.clone().multiply(q_parent.clone().invert());
+                                        if (Math.abs(q_diff.x) <= 1e-5 && Math.abs(q_diff.y) <= 1e-5 && Math.abs(q_diff.z) <= 1e-5 && Math.abs(1 - q_diff.w) <= 1e-5) break;
+                                }
+                        }
 
                         if (get_samples) {
                                 let rotation = new THREE.Euler().setFromQuaternion(Reusable.quat1, 'ZYX');
@@ -714,33 +731,28 @@ class NullObjectAnimator extends BoneAnimator {
                         target.mesh.quaternion.copy(target_original_quaternion);
                         let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
                         target.mesh.quaternion.premultiply(q1.invert());
+
+                        let q_target_unclamped = target.mesh.quaternion.clone();
+                        let q_target = clampQuaternion(target, q_target_unclamped.clone());
+                        target.mesh.quaternion.copy(q_target);
                         target.mesh.updateMatrixWorld();
+
+                        let q_diff = q_target_unclamped.clone().multiply(q_target.clone().invert());
+                        if (Math.abs(q_diff.x) > 1e-5 || Math.abs(q_diff.y) > 1e-5 || Math.abs(q_diff.z) > 1e-5 || Math.abs(1 - q_diff.w) > 1e-5) {
+                                for (let j = bone_references.length - 1; j >= 0; j--) {
+                                        let parent = bone_references[j].bone;
+                                        let q_parent_unclamped = parent.mesh.quaternion.clone().multiply(q_diff).normalize();
+                                        let q_parent = clampQuaternion(parent, q_parent_unclamped.clone());
+                                        parent.mesh.quaternion.copy(q_parent);
+                                        parent.mesh.updateMatrixWorld();
+                                        q_diff = q_parent_unclamped.clone().multiply(q_parent.clone().invert());
+                                        if (Math.abs(q_diff.x) <= 1e-5 && Math.abs(q_diff.y) <= 1e-5 && Math.abs(q_diff.z) <= 1e-5 && Math.abs(1 - q_diff.w) <= 1e-5) break;
+                                }
+                        }
 
                         rotation.x = target.mesh.rotation.x - rotation.x;
                         rotation.y = target.mesh.rotation.y - rotation.y;
                         rotation.z = target.mesh.rotation.z - rotation.z;
-
-                        if (window.IKConstraints && target.rotation_limit_enabled) {
-                                const keep = Math.min(2, Math.max(0, Math.floor(target.rotation_hinge_axis || 0)));
-                                const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0)
-                                        : keep === 1 ? new THREE.Vector3(0,1,0)
-                                        : new THREE.Vector3(0,0,1)).applyQuaternion(target.rest_quaternion || new THREE.Quaternion());
-                                const minArr = Array.isArray(target.rotation_limit_min) ? target.rotation_limit_min : [-180, -180, -180];
-                                const maxArr = Array.isArray(target.rotation_limit_max) ? target.rotation_limit_max : [180, 180, 180];
-                                if (target.rotation_hinge_lock) {
-                                        const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
-                                        const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                                        target.mesh.quaternion.copy(IKConstraints.clampHinge(target.mesh.quaternion, axisLocal, min, max));
-                                } else {
-                                        const other = [0,1,2].filter(idx => idx !== keep);
-                                        const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
-                                        const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
-                                        const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
-                                        const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                                        target.mesh.quaternion.copy(IKConstraints.clampBall(target.mesh.quaternion, axisLocal, swingX, swingY, twistMin, twistMax));
-                                }
-                                target.mesh.updateMatrixWorld();
-                        }
 
                         if (get_samples) {
                                 results[target.uuid] = {
