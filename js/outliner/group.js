@@ -634,37 +634,61 @@ new NodePreviewController(Group, {
                this.dispatchEvent('update_transform', {group});
        },
        updateTransform(group) {
-               Canvas.updateAllBones([group]);
-               if (group.rotation_limit_enabled) {
+Canvas.updateAllBones([group]);
+if (group.rotation_limit_enabled) {
 if (!group.rotation_limit_helper) {
 group.rotation_limit_helper = new THREE.Object3D();
-Project.model_3d.add(group.rotation_limit_helper);
+if (group.mesh) group.mesh.add(group.rotation_limit_helper);
 }
-while (group.rotation_limit_helper.children.length) {
-let child = group.rotation_limit_helper.children.pop();
+const helper = group.rotation_limit_helper;
+if (helper.parent !== group.mesh && group.mesh) {
+group.mesh.add(helper);
+}
+while (helper.children.length) {
+let child = helper.children.pop();
 if (child.geometry) child.geometry.dispose();
 if (child.material) child.material.dispose();
 }
+helper.visible = group.selected;
+const axisColors = {x: 0xff5555, y: 0x55ff55, z: 0x5555ff};
 ['x', 'y', 'z'].forEach((axis, i) => {
 const min = group.rotation_limit_min[i];
 const max = group.rotation_limit_max[i];
 if (min !== -180 || max !== 180) {
 let start = Math.degToRad(min);
-let length = Math.degToRad(max - min);
-if (length <= 0) length += Math.PI * 2;
-let geometry = new THREE.RingGeometry(0.9, 1, 32, 1, start, length);
-if (axis === 'x') geometry.rotateY(Math.PI / 2);
-else if (axis === 'y') geometry.rotateX(Math.PI / 2);
-let material = new THREE.MeshBasicMaterial({color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.25});
-let mesh = new THREE.Mesh(geometry, material);
-group.rotation_limit_helper.add(mesh);
-group.rotation_limit_helper[axis] = mesh;
+let end = Math.degToRad(max);
+if (end <= start) end += Math.PI * 2;
+let segments = 32;
+let points = [];
+for (let s = 0; s <= segments; s++) {
+let t = start + (end - start) * (s / segments);
+points.push(new THREE.Vector3(Math.cos(t), Math.sin(t), 0));
+}
+let geometry = new THREE.BufferGeometry().setFromPoints(points);
+let color = axisColors[axis];
+let current = group.rotation[i];
+if (current < min || current > max) color = 0xff0000;
+let material = new THREE.LineBasicMaterial({color});
+let line = new THREE.Line(geometry, material);
+if (axis === 'x') line.rotation.y = Math.PI / 2;
+else if (axis === 'y') line.rotation.x = Math.PI / 2;
+helper.add(line);
+helper[axis] = line;
 }
 });
-               } else if (group.rotation_limit_helper) {
-                       group.rotation_limit_helper.visible = false;
+} else if (group.rotation_limit_helper) {
+group.rotation_limit_helper.visible = false;
+}
+this.dispatchEvent('update_transform', {group});
+       }
+,
+       updateSelection(group) {
+               if (NodePreviewController.prototype.updateSelection) {
+                       NodePreviewController.prototype.updateSelection.call(this, group);
                }
-               this.dispatchEvent('update_transform', {group});
+               if (group.rotation_limit_helper) {
+                       group.rotation_limit_helper.visible = group.rotation_limit_enabled && group.selected;
+               }
        }
 })
 
