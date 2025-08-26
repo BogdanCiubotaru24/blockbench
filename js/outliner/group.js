@@ -63,6 +63,9 @@ class Group extends OutlinerNode {
 			this.constructor.preview_controller.setup(this);
 		}
 		Canvas.updateAllBones([this]);
+		if (!this.rest_quaternion && this.mesh) {
+			this.rest_quaternion = this.mesh.quaternion.clone();
+		}
 		return this;
 	}
 	select(event, is_outliner_click) {
