@@ -24,16 +24,15 @@ class TwoBoneChain {
   constructor(L1, L2, opts = {}) {
     this.L1 = L1; this.L2 = L2;
 
-    function buildConstraint(opt, defAxis, defLim) {
-      if (!opt) opt = {};
+    function buildConstraint(opt = {}, defAxis, defLim) {
       const type = opt.type || 'hinge';
       const axis = (opt.axis || defAxis).clone().normalize();
       if (type === 'ball') {
         return {
           type,
           axis,
-          swingX: opt.swingX || Math.PI,
-          swingY: opt.swingY || Math.PI,
+          swingX: opt.swingX != null ? opt.swingX : Math.PI,
+          swingY: opt.swingY != null ? opt.swingY : Math.PI,
           twistMin: opt.twistMin != null ? opt.twistMin : -Math.PI,
           twistMax: opt.twistMax != null ? opt.twistMax : Math.PI
         };

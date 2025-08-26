@@ -626,33 +626,7 @@ class NullObjectAnimator extends BoneAnimator {
 			if (bone.mesh.fix_rotation) bone.mesh.rotation.copy(bone.mesh.fix_rotation);
 		});
 
-		let bone_pos = [];
-		bones.forEach((bone, i) => {
-			let pos = bone.mesh.getWorldPosition(new THREE.Vector3());
-
-			bone_pos.push(pos);
-
-			if (i != bones.length - 1) {
-				let last_diff = bones[i + 1].mesh.getWorldPosition(new THREE.Vector3());
-				bone.mesh.parent.worldToLocal(last_diff).sub(bone.mesh.position).normalize();
-
-				bone_references.push({
-					bone,
-					last_diff,
-				});
-			}
-		});
-
-		let polePos;
-		if (pole) {
-			polePos = pole.mesh.getWorldPosition(new THREE.Vector3());
-		}
-
-                fabrikIter(bone_pos, ik_target, polePos);
-
-                let __posErr = bone_pos[bone_pos.length - 1].distanceTo(ik_target);
-
-                function clampQuaternion(bone, q) {
+                function getConstraint(bone) {
                         if (window.IKConstraints && bone.rotation_limit_enabled) {
                                 const keep = Math.min(2, Math.max(0, Math.floor(bone.rotation_hinge_axis || 0)));
                                 const axisLocal = (keep === 0 ? new THREE.Vector3(1,0,0)
@@ -663,14 +637,53 @@ class NullObjectAnimator extends BoneAnimator {
                                 if (bone.rotation_hinge_lock) {
                                         const min = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
                                         const max = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                                        return IKConstraints.clampHinge(q, axisLocal, min, max);
+                                        return { type: 'hinge', axis: axisLocal, min, max };
                                 } else {
                                         const other = [0,1,2].filter(idx => idx !== keep);
                                         const swingX = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[0]]), Math.abs(maxArr[other[0]])));
                                         const swingY = THREE.MathUtils.degToRad(Math.max(Math.abs(minArr[other[1]]), Math.abs(maxArr[other[1]])));
                                         const twistMin = THREE.MathUtils.degToRad(Math.min(minArr[keep], maxArr[keep]));
                                         const twistMax = THREE.MathUtils.degToRad(Math.max(minArr[keep], maxArr[keep]));
-                                        return IKConstraints.clampBall(q, axisLocal, swingX, swingY, twistMin, twistMax);
+                                        return { type: 'ball', axis: axisLocal, swingX, swingY, twistMin, twistMax };
+                                }
+                        }
+                        return null;
+                }
+
+                let bone_pos = [];
+                bones.forEach((bone, i) => {
+                        let pos = bone.mesh.getWorldPosition(new THREE.Vector3());
+
+                        bone_pos.push(pos);
+
+                        if (i != bones.length - 1) {
+                                let last_diff = bones[i + 1].mesh.getWorldPosition(new THREE.Vector3());
+                                bone.mesh.parent.worldToLocal(last_diff).sub(bone.mesh.position).normalize();
+
+                                bone_references.push({
+                                        bone,
+                                        last_diff,
+                                        constraint: getConstraint(bone)
+                                });
+                        }
+                });
+
+		let polePos;
+		if (pole) {
+			polePos = pole.mesh.getWorldPosition(new THREE.Vector3());
+		}
+
+                fabrikIter(bone_pos, ik_target, polePos);
+
+                let __posErr = bone_pos[bone_pos.length - 1].distanceTo(ik_target);
+
+                function clampQuaternion(constraint, q) {
+                        if (constraint) {
+                                if (constraint.type === 'hinge') {
+                                        return IKConstraints.clampHinge(q, constraint.axis, constraint.min, constraint.max);
+                                } else if (constraint.type === 'ball') {
+                                        const c = constraint;
+                                        return IKConstraints.clampBall(q, c.axis, c.swingX, c.swingY, c.twistMin, c.twistMax);
                                 }
                         }
                         return q;
@@ -693,7 +706,7 @@ class NullObjectAnimator extends BoneAnimator {
 
                         const q_local = bone_ref.bone.mesh.quaternion;
                         let q_new_unclamped = Reusable.quat1.clone().multiply(q_local).normalize();
-                        let q_new = clampQuaternion(bone_ref.bone, q_new_unclamped.clone());
+                        let q_new = clampQuaternion(bone_ref.constraint, q_new_unclamped.clone());
 
                         bone_ref.bone.mesh.quaternion.copy(q_new);
                         bone_ref.bone.mesh.updateMatrixWorld();
@@ -701,9 +714,10 @@ class NullObjectAnimator extends BoneAnimator {
                         let q_diff = q_new_unclamped.clone().multiply(q_new.clone().invert());
                         if (Math.abs(q_diff.x) > 1e-5 || Math.abs(q_diff.y) > 1e-5 || Math.abs(q_diff.z) > 1e-5 || Math.abs(1 - q_diff.w) > 1e-5) {
                                 for (let j = i - 1; j >= 0; j--) {
-                                        let parent = bone_references[j].bone;
+                                        let parent_ref = bone_references[j];
+                                        let parent = parent_ref.bone;
                                         let q_parent_unclamped = parent.mesh.quaternion.clone().multiply(q_diff).normalize();
-                                        let q_parent = clampQuaternion(parent, q_parent_unclamped.clone());
+                                        let q_parent = clampQuaternion(parent_ref.constraint, q_parent_unclamped.clone());
                                         parent.mesh.quaternion.copy(q_parent);
                                         parent.mesh.updateMatrixWorld();
                                         q_diff = q_parent_unclamped.clone().multiply(q_parent.clone().invert());
@@ -732,17 +746,19 @@ class NullObjectAnimator extends BoneAnimator {
                         let q1 = target.mesh.parent.getWorldQuaternion(Reusable.quat1);
                         target.mesh.quaternion.premultiply(q1.invert());
 
+                        let target_constraint = getConstraint(target);
                         let q_target_unclamped = target.mesh.quaternion.clone();
-                        let q_target = clampQuaternion(target, q_target_unclamped.clone());
+                        let q_target = clampQuaternion(target_constraint, q_target_unclamped.clone());
                         target.mesh.quaternion.copy(q_target);
                         target.mesh.updateMatrixWorld();
 
                         let q_diff = q_target_unclamped.clone().multiply(q_target.clone().invert());
                         if (Math.abs(q_diff.x) > 1e-5 || Math.abs(q_diff.y) > 1e-5 || Math.abs(q_diff.z) > 1e-5 || Math.abs(1 - q_diff.w) > 1e-5) {
                                 for (let j = bone_references.length - 1; j >= 0; j--) {
-                                        let parent = bone_references[j].bone;
+                                        let parent_ref = bone_references[j];
+                                        let parent = parent_ref.bone;
                                         let q_parent_unclamped = parent.mesh.quaternion.clone().multiply(q_diff).normalize();
-                                        let q_parent = clampQuaternion(parent, q_parent_unclamped.clone());
+                                        let q_parent = clampQuaternion(parent_ref.constraint, q_parent_unclamped.clone());
                                         parent.mesh.quaternion.copy(q_parent);
                                         parent.mesh.updateMatrixWorld();
                                         q_diff = q_parent_unclamped.clone().multiply(q_parent.clone().invert());
